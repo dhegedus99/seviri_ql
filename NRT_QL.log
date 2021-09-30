@@ -1,0 +1,96 @@
+INFO:root:Beginning processing for 2021-09-10 11:00
+INFO:root:SEVIRI_MK_NRT_QUICKLOOKS: directories
+INFO:root: - Input: ./
+INFO:root: - Output: ./TEST/
+INFO:root:Setting output files and directories
+INFO:root:Reading primary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.primary.nc
+INFO:root: - Read lat
+INFO:root: - Read lon
+INFO:root: - Read cldmask
+INFO:root: - Read illum
+INFO:root: - Read solar_zenith_view_no1
+INFO:root: - Read cth
+INFO:root: - Read cot
+INFO:root: - Read aot550
+INFO:root: - Read aer
+INFO:root: - Read qcflag
+INFO:root: - Read lsflag
+INFO:root: - Read niter
+INFO:root: - Read costjm
+INFO:root:Reading secondary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.secondary.nc
+INFO:root: - Read reflectance_in_channel_no_1
+INFO:root: - Read reflectance_in_channel_no_2
+INFO:root: - Read reflectance_in_channel_no_3
+INFO:root: - Read brightness_temperature_in_channel_no_9
+INFO:root:Beginning processing for 2021-09-10 11:00
+INFO:root:SEVIRI_MK_NRT_QUICKLOOKS: directories
+INFO:root: - Input: ./
+INFO:root: - Output: ./TEST/
+INFO:root:Setting output files and directories
+INFO:root:Reading primary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.primary.nc
+INFO:root: - Read lat
+INFO:root: - Read lon
+INFO:root: - Read cldmask
+INFO:root: - Read illum
+INFO:root: - Read solar_zenith_view_no1
+INFO:root: - Read cth
+INFO:root: - Read cot
+INFO:root: - Read aot550
+INFO:root: - Read aer
+INFO:root: - Read qcflag
+INFO:root: - Read lsflag
+INFO:root: - Read niter
+INFO:root: - Read costjm
+INFO:root:Reading secondary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.secondary.nc
+INFO:root: - Read reflectance_in_channel_no_1
+INFO:root: - Read reflectance_in_channel_no_2
+INFO:root: - Read reflectance_in_channel_no_3
+INFO:root: - Read brightness_temperature_in_channel_no_9
+INFO:root:Beginning processing for 2021-09-10 11:00
+INFO:root:SEVIRI_MK_NRT_QUICKLOOKS: directories
+INFO:root: - Input: ./
+INFO:root: - Output: ./TEST/
+INFO:root:Setting output files and directories
+INFO:root:Reading primary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.primary.nc
+INFO:root: - Read lat
+INFO:root: - Read lon
+INFO:root: - Read cldmask
+INFO:root: - Read illum
+INFO:root: - Read solar_zenith_view_no1
+INFO:root: - Read cth
+INFO:root: - Read cot
+INFO:root: - Read aot550
+INFO:root: - Read aer
+INFO:root: - Read qcflag
+INFO:root: - Read lsflag
+INFO:root: - Read niter
+INFO:root: - Read costjm
+INFO:root:Reading secondary file: .\NCEO-L2-CLOUD-AEROSOL-SEVIRI_ORAC_MSG4_202109101100_R9999.secondary.nc
+INFO:root: - Read reflectance_in_channel_no_1
+INFO:root: - Read reflectance_in_channel_no_2
+INFO:root: - Read reflectance_in_channel_no_3
+INFO:root: - Read brightness_temperature_in_channel_no_9
+DEBUG:PIL.PngImagePlugin:STREAM b'IHDR' 16 13
+DEBUG:PIL.PngImagePlugin:STREAM b'IDAT' 41 65536
+DEBUG:PIL.PngImagePlugin:STREAM b'IHDR' 16 13
+DEBUG:PIL.PngImagePlugin:STREAM b'IDAT' 41 65536
+DEBUG:PIL.PngImagePlugin:STREAM b'IHDR' 16 13
+DEBUG:PIL.PngImagePlugin:STREAM b'gAMA' 41 4
+DEBUG:PIL.PngImagePlugin:STREAM b'cHRM' 57 32
+DEBUG:PIL.PngImagePlugin:STREAM b'bKGD' 101 6
+DEBUG:PIL.PngImagePlugin:b'bKGD' 101 6 (unknown)
+DEBUG:PIL.PngImagePlugin:STREAM b'tIME' 119 7
+DEBUG:PIL.PngImagePlugin:b'tIME' 119 7 (unknown)
+DEBUG:PIL.PngImagePlugin:STREAM b'IDAT' 138 32768
+DEBUG:PIL.PngImagePlugin:STREAM b'tEXt' 1091607 37
+DEBUG:PIL.PngImagePlugin:STREAM b'tEXt' 1091656 37
+DEBUG:PIL.PngImagePlugin:STREAM b'IHDR' 16 13
+DEBUG:PIL.PngImagePlugin:STREAM b'gAMA' 41 4
+DEBUG:PIL.PngImagePlugin:STREAM b'cHRM' 57 32
+DEBUG:PIL.PngImagePlugin:STREAM b'bKGD' 101 6
+DEBUG:PIL.PngImagePlugin:b'bKGD' 101 6 (unknown)
+DEBUG:PIL.PngImagePlugin:STREAM b'tIME' 119 7
+DEBUG:PIL.PngImagePlugin:b'tIME' 119 7 (unknown)
+DEBUG:PIL.PngImagePlugin:STREAM b'IDAT' 138 32768
+DEBUG:PIL.PngImagePlugin:STREAM b'tEXt' 1091607 37
+DEBUG:PIL.PngImagePlugin:STREAM b'tEXt' 1091656 37
