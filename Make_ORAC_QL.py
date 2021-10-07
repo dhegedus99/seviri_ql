@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 
 import seviri_additional_cloud_tests as extra_tests
-from datetime import datetime, timedelta
 from pycoast import ContourWriterAGG
+from datetime import datetime
 import plotting as sev_plot
 from netCDF4 import Dataset
 from PIL import Image
 from glob import glob
 import numpy as np
+import ql_utils
 import warnings
 import pathlib
 import logging
@@ -18,56 +19,7 @@ start_time = datetime.utcnow()
 warnings.filterwarnings('ignore')
 
 logfile = './NRT_QL.log'
-
 logging.basicConfig(filename=logfile, level=logging.DEBUG)
-
-# Directory containing the ORAC pri + sec files
-indir = './'
-# Top level directory for the output files
-outdir_top = './TEST/'
-
-# Directory containing coastline shapefiles
-coast_dir = 'C:/Users/simon/OneDrive/Documents/Shapefiles/'
-
-# Timeslot to search for, YYYYMMDDHHMM
-dtstr = '202109101100'
-dater = datetime.strptime(dtstr, "%Y%m%d%H%M")
-
-# Whether to overwrite files
-clobber = False
-
-# Aerosol quality control flag
-aerosol_qc = None
-
-# Distance to cloud for flagging
-dist2cloud = 10
-
-# Aerosol land sea mask flag
-aerosol_landsea = False
-
-# Are we doing cesium or quicklooks
-cesium = True
-
-# Should we flip data? ORAC outputs transposed in both directions
-flip_data = True
-
-# Shall we make subdirectories based on date
-auto_out = True
-
-# Set image output size in pixels
-out_img_pix = (1700, 597)
-
-# Set lat/lon limits of output image
-out_img_ll = (-71.8154, 29.1062, 30.1846, 64.7465)
-
-# List of variables to be read from primary file
-pvar = ['lat', 'lon', 'cldmask', 'illum', 'solar_zenith_view_no1',
-        'cth', 'cot', 'aot550', 'aer', 'qcflag', 'lsflag', 'niter', 'costjm']
-
-# List of variables to be read from secondary file
-svar = ['reflectance_in_channel_no_1', 'reflectance_in_channel_no_2',
-        'reflectance_in_channel_no_3',
-        'brightness_temperature_in_channel_no_9']
 
 
 def load_orac(in_file, var_list, flipper):
@@ -101,7 +53,7 @@ def set_output_dir(odir_top, indate):
     """Define and create output directory based on the date.
     Inputs:
      - outdir_top: String, top-level output directory.
-     - dater: Datetime, current processing timeslot.
+     - indate: Datetime, current processing timeslot.
     Returns:
      - outdir: String, correct directory for saving output."""
     outdir = f'{odir_top}/{indate.strftime("%Y/%m/%d")}/'
@@ -151,30 +103,30 @@ def apply_basic_qc(pri_data):
     return None
 
 
-def main():
-    logging.info(f'Beginning processing for {dater.strftime("%Y-%m-%d %H:%M")}')
+def main(opts):
+    logging.info(f'Beginning processing for {opts.dater.strftime("%Y-%m-%d %H:%M")}')
 
     # Locate primary and secondary files
-    inf_pri = glob(f'{indir}/*{dtstr}*.primary.nc')
-    inf_sec = glob(f'{indir}/*{dtstr}*.secondary.nc')
+    inf_pri = glob(f'{opts.indir}/*{opts.dtstr}*.primary.nc')
+    inf_sec = glob(f'{opts.indir}/*{opts.dtstr}*.secondary.nc')
 
     # Check that files exist, raise error if not
     if len(inf_pri) < 1:
-        raise OSError(f"Error: Cannot find primary file for {dtstr}!")
+        raise OSError(f"Error: Cannot find primary file for {opts.dtstr}!")
     else:
         inf_pri = inf_pri[0]
     if len(inf_sec) < 1:
-        raise OSError(f"Error: Cannot find secondary file for {dtstr}!")
+        raise OSError(f"Error: Cannot find secondary file for {opts.dtstr}!")
     else:
         inf_sec = inf_sec[0]
 
     logging.info(f'SEVIRI_MK_NRT_QUICKLOOKS: directories')
-    logging.info(f' - Input: {indir}')
-    logging.info(f' - Output: {outdir_top}')
+    logging.info(f' - Input: {opts.indir}')
+    logging.info(f' - Output: {opts.outdir_top}')
 
     # Set up directories
     logging.info(f'Setting output files and directories')
-    outdir = set_output_dir(outdir_top, dater)
+    outdir = set_output_dir(opts.outdir_top, opts.dater)
     # Set output filenames
     outfiles_ql = set_output_files(outdir, inf_pri, False)
     outfiles_cs = set_output_files(outdir, inf_pri, True)
@@ -187,30 +139,31 @@ def main():
 
     # Load the primary and secondary variables from ORAC output
     logging.info(f'Reading primary file: {inf_pri}')
-    pri_data = load_orac(inf_pri, pvar, flip_data)
+    pri_data = load_orac(inf_pri, opts.pvar, opts.flip_data)
     logging.info(f'Reading secondary file: {inf_sec}')
-    sec_data = load_orac(inf_sec, svar, flip_data)
+    sec_data = load_orac(inf_sec, opts.svar, opts.flip_data)
 
-    if aerosol_qc is not None:
+    if opts.aerosol_qc is not None:
         logging.info(f'Applying additional aerosol quality filtering.')
-        extra_tests.seviri_additional_cloud_tests(pri_data, aerosol_qc, dist2cloud)
+        extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
 
     odata = sev_plot.retr_fc(pri_data, sec_data)
-    res_data, res_area = sev_plot.resample_data(odata, pri_data, out_img_pix, out_img_ll)
+    res_data, res_area = sev_plot.resample_data(odata, pri_data, opts.out_img_pix, opts.out_img_ll)
     area_def = (res_area.proj4_string, res_area.area_extent)
     save_fc = sev_plot.make_alpha(res_data[:, :, ::-1])
     img = Image.fromarray(save_fc)
 
-    cw = ContourWriterAGG(coast_dir)
+    cw = ContourWriterAGG(opts.coast_dir)
     cw.add_coastlines(img, area_def, resolution='l', level=4)
     cw.add_borders(img, area_def)
     img.save("out_res_border.png")
 
-
     return
 
 
-main()
+main_opts = ql_utils.QuickLook_Opts()
+
+main(main_opts)
 
 end_time = datetime.utcnow()
 

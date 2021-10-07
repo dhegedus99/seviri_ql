@@ -41,11 +41,8 @@ def retr_fc(pridata, secdata, perc_max=99, sza_thresh=70.):
         img[:, :, 1] = img[:, :, 1] + scale * irbt
         img[:, :, 2] = img[:, :, 2] + scale * irbt
 
-    print(np.nanmin(img), np.nanmean(img), np.nanmax(img))
     img = np.round(np.where(img > 1, 1., img) * 255)
-    print(np.nanmin(img), np.nanmean(img), np.nanmax(img))
     img = img.astype(np.ubyte)
-    print(np.nanmin(img), np.nanmean(img), np.nanmax(img))
 
     return img
 
@@ -57,14 +54,19 @@ def resample_data(indata, pridata, img_size, img_bnds, meth='bilin'):
         -   pridata: Dict,  ORAC primary data.
         -   img_size: Tuple, x and y output image size
         -   img_bnds: Tuple, lat/lon boundaries for output (lon_0, lat_0, lon_1, lat_1)
-        -   meth: String, determine resampling method. Currently only bilinear supported.
+        -   meth: String, resampling method. Only bilinear and nearest supported.
     Outputs:
         -   res_img: 2d/3d numpy array, resampled to desired projection
     """
     from pyresample import create_area_def, geometry, image
 
     indata_def = geometry.SwathDefinition(lats=pridata['lat'], lons=pridata['lon'])
-    swath_con = image.ImageContainerNearest(indata, indata_def, radius_of_influence=25000)
+    if meth == 'near':
+        swath_con = image.ImageContainerNearest(indata, indata_def, radius_of_influence=25000)
+    elif meth == 'bilin':
+        swath_con = image.ImageContainerBilinear(indata, indata_def, radius_of_influence=25000)
+    else:
+        raise NotImplementedError('Only nearest (near) and bilinear (bilin) resampling are supported!')
 
     area_def = create_area_def('test_area',
                                {'proj': 'latlong', 'lon_0': 0},
