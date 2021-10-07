@@ -27,7 +27,7 @@ indir = './'
 outdir_top = './TEST/'
 
 # Directory containing coastline shapefiles
-coast_dir = 'C:/Users/EUMETCAST#/Documents/coast/'
+coast_dir = 'C:/Users/simon/OneDrive/Documents/Shapefiles/'
 
 # Timeslot to search for, YYYYMMDDHHMM
 dtstr = '202109101100'
