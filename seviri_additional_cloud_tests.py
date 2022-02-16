@@ -20,10 +20,29 @@ def fmi_cloud_qc_1km():
 def opening_test():
     raise NotImplementedError('Currently opening_test is not implemented')
 
+def orac_1km_dist_to_cloud(cld, qual, bitmask, window=31, nx=False, ny=False):
+    """Find the distance of each pixel to the nearest cloud."""
+    if not nx:
+        nx = cld.shape[0]
+    if not ny:
+        ny = cld.shape[1]
+
+    # Set up window size, ensuring it is odd
+    window = int(window)
+    if window % 2 == 0:
+        window += 1
+
+    dist = np.zeros((window, window))
+    ii = (np.arange(window) - window / 2) ^ 2
+    for i in range(0, window-1):
+        dist[:, i] = np.sqrt(ii + ii[i])
+    maxdist = np.nanmax(dist)
+    return dist
+
 
 def seviri_additional_cloud_tests(data_dict,
-                                  qcselection=255,
-                                  dist2cld=0,
+                                  qcselection=284,
+                                  dist2cld=3,
                                   minclr=5):
     """Apply extra cloud / QC filtering to the ORAC data.
     Inputs:
@@ -52,6 +71,8 @@ def seviri_additional_cloud_tests(data_dict,
                 'ice': 64,
                 'ang_open': 128,
                 'cld_dist': 256}
+
+    cld = data_dict['cldmask']
 
     if dist2cld > 0 and qcselection < 256:
         qcselection += 256
@@ -89,6 +110,12 @@ def seviri_additional_cloud_tests(data_dict,
         qual_arr = qual_arr + (data_dict['niter'] * bit_vals['aod_open'])
     if _bit_check(qcselection, bits['ref_open']):
         qual_arr = qual_arr + (data_dict['niter'] * bit_vals['ref_open'])
+
+    # Perform cloud distance parameter
+    if dist2cld > 0:
+        cldbits = 0
+        clddist = orac_1km_dist_to_cloud(cld, qual_arr, bitmask=cldbits, window=2*dist2cld+1)
+    data_dict['clddist'] = clddist
 
     data_dict['qcflag'] = data_dict['qcflag'] + 64 * qual_arr
     return data_dict

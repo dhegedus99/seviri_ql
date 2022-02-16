@@ -1,10 +1,8 @@
 #!/usr/bin/env python
 
 import seviri_additional_cloud_tests as extra_tests
-from pycoast import ContourWriterAGG
 from datetime import datetime
 import plotting as sev_plot
-from PIL import Image
 from glob import glob
 import ql_utils
 import warnings
@@ -15,7 +13,7 @@ start_time = datetime.utcnow()
 warnings.filterwarnings('ignore')
 
 logfile = './NRT_QL.log'
-logging.basicConfig(filename=logfile, level=logging.DEBUG)
+logging.basicConfig(filename=logfile, filemode='w', level=logging.DEBUG)
 
 
 def main(opts):
@@ -43,8 +41,8 @@ def main(opts):
     logging.info(f'Setting output files and directories')
     outdir = ql_utils.set_output_dir(opts.outdir_top, opts.dater)
     # Set output filenames
-    outfiles_ql = ql_utils.set_output_files(outdir, inf_pri, False)
-    outfiles_cs = ql_utils.set_output_files(outdir, inf_pri, True)
+    outfiles_ql = ql_utils.set_output_files_ql(outdir, inf_pri)
+    outfiles_cs = ql_utils.set_output_files_cs(outdir, inf_pri)
 
     # Are files present? If so, no need to process
     all_done = ql_utils.test_files({**outfiles_ql, **outfiles_cs})
@@ -58,28 +56,30 @@ def main(opts):
     logging.info(f'Reading secondary file: {inf_sec}')
     sec_data = ql_utils.load_orac(inf_sec, opts.svar, opts.flip_data)
 
+    print(pri_data.keys())
+
     if opts.aerosol_qc is not None:
         logging.info(f'Applying additional aerosol quality filtering.')
-        extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
+       # extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
 
-    odata = sev_plot.retr_fc(pri_data, sec_data)
-    res_data, res_area = sev_plot.resample_data(odata, pri_data, opts.out_img_pix, opts.out_img_ll)
+    # Get the output data scaled into byte range
+    odata_fc = sev_plot.retr_fc(pri_data, sec_data, opts.perc_max, opts.sza_thresh)
+
+    # Resample onto appropriate grid for cesium
+    res_data, res_area = sev_plot.resample_data(odata_fc, pri_data, opts)
+    # Find area definition, needed for coastlines
     area_def = (res_area.proj4_string, res_area.area_extent)
-    save_fc = sev_plot.make_alpha(res_data[:, :, ::-1])
-    img = Image.fromarray(save_fc)
-
-    cw = ContourWriterAGG(opts.coast_dir)
-    cw.add_coastlines(img, area_def, resolution='l', level=4)
-    cw.add_borders(img, area_def)
-    img.save("out_res_border.png")
+    # Save the output to disk
+    sev_plot.save_plot(outfiles_cs['FC'], res_data, opts, area_def)
 
     return
 
 
-main_opts = ql_utils.QuickLook_Opts()
+main_opts = ql_utils.QuickLookOpts(coast_dir='C:/Users/EUMETCAST#/Documents/coast/', res_meth='bilin')
+#main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin')
 
 main(main_opts)
 
 end_time = datetime.utcnow()
 
-print(end_time - start_time)
+print(f'Time taken: {(end_time - start_time).total_seconds():5.3f} sec')

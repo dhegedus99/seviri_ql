@@ -1,5 +1,30 @@
+from pycoast import ContourWriterAGG
 import matplotlib.pyplot as plt
+from PIL import Image
 import numpy as np
+
+
+def save_plot(fname, data, opts, area_def):
+    """Save plot-ready data to file."""
+    save_fc = make_alpha(data[:, :, ::-1])
+    img = Image.fromarray(save_fc)
+    if opts.coast_dir is not None:
+        cw = ContourWriterAGG(opts.coast_dir)
+        cw.add_coastlines(img, area_def, resolution='l', level=4)
+        cw.add_borders(img, area_def)
+    img.save(fname)
+
+
+def retr_var(pridata, secdata, typ, opts):
+    """Retrieve a plot of given variable in original projection.
+    Inputs:
+        -   pridata: Dict, ORAC primary file data.
+        -   secdata: Dict, ORAC secondary file data.
+        -   typ: Str, output data type. Valid values are: 'cth', 'dcth', 'cer', 'aod' and 'cot'.
+        -   opts: QuickLookOpts, processing options class.
+    Returns:
+        -   img: 3d float array, colourised image from given ORAC data.
+    """
 
 
 def retr_fc(pridata, secdata, perc_max=99, sza_thresh=70.):
@@ -47,7 +72,7 @@ def retr_fc(pridata, secdata, perc_max=99, sza_thresh=70.):
     return img
 
 
-def resample_data(indata, pridata, img_size, img_bnds, meth='bilin'):
+def resample_data(indata, pridata, opts, roi=50000):
     """Transform raw SEVIRI data into required output projection.
     Inputs:
         -   indata: 2d or 3d numpy array, ORAc/false colour data in native projection.
@@ -60,22 +85,33 @@ def resample_data(indata, pridata, img_size, img_bnds, meth='bilin'):
     """
     from pyresample import create_area_def, geometry, image
 
-    indata_def = geometry.SwathDefinition(lats=pridata['lat'], lons=pridata['lon'])
-    if meth == 'near':
-        swath_con = image.ImageContainerNearest(indata, indata_def, radius_of_influence=25000)
-    elif meth == 'bilin':
-        swath_con = image.ImageContainerBilinear(indata, indata_def, radius_of_influence=25000)
+    lats = pridata['lat']
+    lats = np.where(lats > -90, lats, 180.)
+    lats = np.where(np.isfinite(lats), lats, 380.)
+    lons = pridata['lon']
+    lons = np.where(lons > -180, lons, 380.)
+    lons = np.where(np.isfinite(lons), lons, 380.)
+
+    indata_def = geometry.SwathDefinition(lats=lats, lons=lons)
+    if opts.res_meth == 'near':
+        swath_con = image.ImageContainerNearest(indata, indata_def, radius_of_influence=roi)
+    elif opts.res_meth == 'bilin':
+        swath_con = image.ImageContainerBilinear(indata, indata_def, radius_of_influence=roi)
     else:
         raise NotImplementedError('Only nearest (near) and bilinear (bilin) resampling are supported!')
 
     area_def = create_area_def('test_area',
                                {'proj': 'latlong', 'lon_0': 0},
-                               area_extent=img_bnds,
-                               width=img_size[0],
-                               height=img_size[1],
+                               area_extent=opts.out_img_ll,
+                               width=opts.out_img_pix[0],
+                               height=opts.out_img_pix[1],
                                units='degrees',)
     area_con = swath_con.resample(area_def)
     result = area_con.image_data
+    print(indata_def)
+    print(np.nanmean(indata), indata.shape)
+    print(np.nanmean(result), result.shape)
+
     return result, area_def
 
 
