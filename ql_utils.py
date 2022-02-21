@@ -1,5 +1,6 @@
 from datetime import datetime
 from netCDF4 import Dataset
+from matplotlib import cm
 import numpy as np
 import pathlib
 import logging
@@ -12,39 +13,24 @@ def_svar = ('reflectance_in_channel_no_1', 'reflectance_in_channel_no_2',
             'reflectance_in_channel_no_3', 'brightness_temperature_in_channel_no_9')
 
 
-class OutputLims:
-    def __init__(self,
-                 min_aod=0.,
-                 max_aod=5.,
-                 min_cth=0.,
-                 max_cth=15.,
-                 min_cer=0.,
-                 max_cer=50.,
-                 min_dcth=0,
-                 max_dcth=10.,
-                 min_cod=0,
-                 max_cod=100.):
+def limdict(min_aod=0.01,
+            max_aod=1.2,
+            min_cth=0.02,
+            max_cth=15.,
+            min_cer=0.,
+            max_cer=50.,
+            min_dcth=0,
+            max_dcth=10.,
+            min_cod=0.1,
+            max_cod=100.):
 
-        # Minimum aerosol optical depth for plotting
-        self.min_aod = min_aod
-        # Maximum aerosol optical depth for plotting
-        self.max_aod = max_aod
-        # Minimum cloud top height for plotting
-        self.min_cth = min_cth
-        # Maximum cloud top height for plotting
-        self.max_cth = max_cth
-        # Minimum cloud effective radius for plotting
-        self.min_cer = min_cer
-        # Maximum cloud effective radius for plotting
-        self.max_cer = max_cer
-        # Minimum cloud height uncertainty for plotting
-        self.min_dcth = min_dcth
-        # Maximum cloud height uncertainty for plotting
-        self.max_dcth = max_dcth
-        # Minimum cloud optical depth for plotting
-        self.min_cod = min_cod
-        # Maximum cloud optical depth for plotting
-        self.max_cod = max_cod
+    lim_dict = {'AOD': [min_aod, max_aod],
+                'CTH': [min_cth, max_cth],
+                'CER': [min_cer, max_cer],
+                'COT': [min_cod, max_cod],
+                'dCTH': [min_dcth, max_dcth]}
+
+    return lim_dict
 
 
 class QuickLookOpts:
@@ -67,8 +53,17 @@ class QuickLookOpts:
                  svar=def_svar,
                  sza_thresh=70.,
                  perc_max=99.,
-                 res_meth='bilin'):
-
+                 res_meth='bilin',
+                 logscl=False,
+                 keyticks=None,
+                 keytitle='',
+                 title_stub='',
+                 title='',
+                 outlims=limdict(),
+                 platform='',
+                 varname='',
+                 cmap=cm.viridis,
+                 add_coast=False):
         # Directory containing the ORAC pri + sec files
         self.indir = indir
         # Top level directory for the output files
@@ -126,6 +121,36 @@ class QuickLookOpts:
         # Resampling method, 'bilin' or 'near' supported
         self.res_meth = res_meth
 
+        # Plotting scale, log if True or linear if False
+        self.logscl = logscl
+
+        # Tickmarks for colorbar, list of values
+        self.keyticks = keyticks
+
+        # Legend title string
+        self.keytitle = keytitle
+
+        # Plot title stub common across plots
+        self.title_stub = title_stub
+
+        # Plot title string
+        self.title = title
+
+        # Max min values for plotting. If not supplied, use default class.
+        self.outlims = outlims
+
+        # Platform name
+        self.platform = platform
+
+        # Name of variable being plotted
+        self.varname = varname
+
+        # Colormap for plotting
+        self.cmap = cmap
+
+        # Flag for whether we plot coastlines
+        self.add_coast = add_coast
+
 
 def load_orac(in_file, var_list, flipper):
     """Read ORAC variables from file into dict.
@@ -143,17 +168,18 @@ def load_orac(in_file, var_list, flipper):
     var_dict = {}
     for variable in var_list:
         try:
-            data = np.array(fid[variable])
+            data = np.squeeze(np.array(fid[variable]))
             if flipper:
                 data = np.fliplr(np.flipud(data))
             # Remove fill value pixels
-            data = np.where(data > -100, data, np.nan)
+            data = np.where(data > -100, data, 0)
             var_dict[variable] = data
             logging.info(f' - Read {variable}')
         except IndexError:
             logging.info(f' - Variable {variable} not found in file {in_file}')
+    plat = fid.Platform
     fid.close()
-    return var_dict
+    return var_dict, plat
 
 
 def set_output_dir(odir_top, indate):
@@ -181,7 +207,7 @@ def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 
     # Find base filename
     base_fname = os.path.basename(pri_fname)
     pos = base_fname.find('SEVIRI_ORAC_MSG')
-    dtstr = base_fname[pos+offset:pos+offset+12]
+    dtstr = base_fname[pos + offset:pos + offset + 12]
     out_fnames = {}
     for var in var_out_list:
         out_fnames[var] = f'{odir}/{dtstr}_{var}.png'

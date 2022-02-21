@@ -52,31 +52,60 @@ def main(opts):
 
     # Load the primary and secondary variables from ORAC output
     logging.info(f'Reading primary file: {inf_pri}')
-    pri_data = ql_utils.load_orac(inf_pri, opts.pvar, opts.flip_data)
+    pri_data, priplat = ql_utils.load_orac(inf_pri, opts.pvar, opts.flip_data)
     logging.info(f'Reading secondary file: {inf_sec}')
-    sec_data = ql_utils.load_orac(inf_sec, opts.svar, opts.flip_data)
+    sec_data, secplat = ql_utils.load_orac(inf_sec, opts.svar, opts.flip_data)
 
-    print(pri_data.keys())
+    if priplat != secplat:
+        raise ValueError("Platforms do not match!", priplat, secplat)
+    else:
+        opts.platform = priplat
+        opts.title_stub = f'{opts.platform}-SEVIRI {opts.dater.strftime("%Y %m %d %H:%M")}'
 
     if opts.aerosol_qc is not None:
         logging.info(f'Applying additional aerosol quality filtering.')
-       # extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
+        pri_data = extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
 
+    # False color image
     # Get the output data scaled into byte range
     odata_fc = sev_plot.retr_fc(pri_data, sec_data, opts.perc_max, opts.sza_thresh)
-
     # Resample onto appropriate grid for cesium
-    res_data, res_area = sev_plot.resample_data(odata_fc, pri_data, opts)
+    res_data_fc, res_area = sev_plot.resample_data(odata_fc, pri_data, opts)
     # Find area definition, needed for coastlines
     area_def = (res_area.proj4_string, res_area.area_extent)
     # Save the output to disk
-    sev_plot.save_plot(outfiles_cs['FC'], res_data, opts, area_def)
+    sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def)
 
-    return
+    # Cloud top height image
+    opts.logscl = False
+    opts.varname = 'CTH'
+    opts.title = opts.title_stub + opts.varname
+    opts.keytitle = 'Cloud-top height (km)'
+    opts.keyticks = ['0', '3', '6', '9', '12', '>15']
+    res_data_cod, res_area = sev_plot.resample_data(pri_data['cth'], pri_data, opts)
+    sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
+
+    # Cloud Optical depth image
+    opts.logscl = True
+    opts.varname = 'COT'
+    opts.title = opts.title_stub + opts.varname
+    opts.keytitle = 'Cloud optical depth (550 nm)'
+    opts.keyticks = ['0.1', '1', '10', '>100']
+    res_data_cod, res_area = sev_plot.resample_data(pri_data['cot'], pri_data, opts)
+    sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
+
+    # Aerosol Optical depth image
+    opts.logscl = False
+    opts.varname = 'AOD'
+    opts.title = opts.title_stub + opts.varname
+    opts.keytitle = 'Aerosol optical depth (550 nm)'
+    opts.keyticks = ['0.0', '0.2', '0.4', '0.6', '0.8', '1.0', '>1.2']
+    res_data_cod, res_area = sev_plot.resample_data(pri_data['aot550'], pri_data, opts)
+    sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
 
 
-main_opts = ql_utils.QuickLookOpts(coast_dir='C:/Users/EUMETCAST#/Documents/coast/', res_meth='bilin')
-#main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin')
+# main_opts = ql_utils.QuickLookOpts(coast_dir='C:/Users/EUMETCAST#/Documents/coast/', res_meth='bilin')
+main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin')
 
 main(main_opts)
 

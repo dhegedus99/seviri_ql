@@ -1,17 +1,51 @@
 from pycoast import ContourWriterAGG
-import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 
 
-def save_plot(fname, data, opts, area_def):
+def save_plot_fc(fname, data, opts, area_def):
     """Save plot-ready data to file."""
     save_fc = make_alpha(data[:, :, ::-1])
     img = Image.fromarray(save_fc)
-    if opts.coast_dir is not None:
+    if opts.add_coast:
         cw = ContourWriterAGG(opts.coast_dir)
         cw.add_coastlines(img, area_def, resolution='l', level=4)
         cw.add_borders(img, area_def)
+    img.save(fname)
+
+
+def save_plot_cmap(fname, data, opts):
+    """Save plot-ready data to file."""
+    data = np.copy(data)
+
+    # Get the colormap
+    cur_cmap = opts.cmap.copy()
+
+    # Find the correct range limits for a given variable, in log scale if needed
+    if opts.logscl:
+        rng_min = np.log10(opts.outlims[opts.varname][0])
+        rng_max = np.log10(opts.outlims[opts.varname][1])
+        data = np.log10(data)
+    else:
+        rng_min = opts.outlims[opts.varname][0]
+        rng_max = opts.outlims[opts.varname][1]
+    print(opts.varname, rng_min, rng_max)
+
+    # Set data lims for plotting and init mask
+    mask = data.copy()
+    data = np.where(data < rng_min, -1, data)
+    data = np.where(data > rng_max, rng_max, data)
+
+    # Populate mask
+    mask = np.where(mask < rng_min, 0, 255)
+
+    # Normalise data
+    data = data / rng_max
+
+    # Make the image and save
+    im = np.uint8(cur_cmap(data) * 255)
+    im[:, :, 3] = mask
+    img = Image.fromarray(im)
     img.save(fname)
 
 
@@ -75,7 +109,7 @@ def retr_fc(pridata, secdata, perc_max=99, sza_thresh=70.):
 def resample_data(indata, pridata, opts, roi=50000):
     """Transform raw SEVIRI data into required output projection.
     Inputs:
-        -   indata: 2d or 3d numpy array, ORAc/false colour data in native projection.
+        -   indata: 2d or 3d numpy array, ORAC/false colour data in native projection.
         -   pridata: Dict,  ORAC primary data.
         -   img_size: Tuple, x and y output image size
         -   img_bnds: Tuple, lat/lon boundaries for output (lon_0, lat_0, lon_1, lat_1)
@@ -108,9 +142,6 @@ def resample_data(indata, pridata, opts, roi=50000):
                                units='degrees',)
     area_con = swath_con.resample(area_def)
     result = area_con.image_data
-    print(indata_def)
-    print(np.nanmean(indata), indata.shape)
-    print(np.nanmean(result), result.shape)
 
     return result, area_def
 
