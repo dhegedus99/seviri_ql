@@ -14,9 +14,12 @@ def save_plot_fc(fname, data, opts, area_def):
     img.save(fname)
 
 
-def save_plot_cmap(fname, data, opts):
+def save_plot_cmap(fname, data, opts, fill_value=-999, data_filt=None):
     """Save plot-ready data to file."""
-    data = np.copy(data)
+    data_proc = np.copy(data)
+
+    if data_filt is not None:
+        data_proc = np.where(data_filt == 0, data_proc, fill_value)
 
     # Get the colormap
     cur_cmap = opts.cmap.copy()
@@ -25,40 +28,33 @@ def save_plot_cmap(fname, data, opts):
     if opts.logscl:
         rng_min = np.log10(opts.outlims[opts.varname][0])
         rng_max = np.log10(opts.outlims[opts.varname][1])
-        data = np.log10(data)
+        data_proc = np.log10(data_proc)
+        data_proc = np.where(np.isfinite(data_proc), data_proc, fill_value)
     else:
         rng_min = opts.outlims[opts.varname][0]
         rng_max = opts.outlims[opts.varname][1]
-    print(opts.varname, rng_min, rng_max)
+    print("")
+    print(opts.varname, opts.logscl, rng_min, rng_max, opts.outlims[opts.varname][0], opts.outlims[opts.varname][1])
+    print(np.nanmin(data), np.nanmean(data), np.nanmax(data))
+    print(np.nanmin(data_proc), np.nanmean(data_proc), np.nanmax(data_proc))
 
     # Set data lims for plotting and init mask
-    mask = data.copy()
-    data = np.where(data < rng_min, -1, data)
-    data = np.where(data > rng_max, rng_max, data)
+    mask = data_proc.copy()
+    data_proc = np.where(data_proc < rng_min, fill_value, data_proc)
+    data_proc = np.where(data_proc > rng_max, rng_max, data_proc)
+    print(np.nanmin(data_proc), np.nanmean(data_proc), np.nanmax(data_proc))
 
     # Populate mask
     mask = np.where(mask < rng_min, 0, 255)
 
     # Normalise data
-    data = data / rng_max
+    data_proc = data_proc / rng_max
 
     # Make the image and save
-    im = np.uint8(cur_cmap(data) * 255)
+    im = np.uint8(cur_cmap(data_proc) * 255)
     im[:, :, 3] = mask
     img = Image.fromarray(im)
     img.save(fname)
-
-
-def retr_var(pridata, secdata, typ, opts):
-    """Retrieve a plot of given variable in original projection.
-    Inputs:
-        -   pridata: Dict, ORAC primary file data.
-        -   secdata: Dict, ORAC secondary file data.
-        -   typ: Str, output data type. Valid values are: 'cth', 'dcth', 'cer', 'aod' and 'cot'.
-        -   opts: QuickLookOpts, processing options class.
-    Returns:
-        -   img: 3d float array, colourised image from given ORAC data.
-    """
 
 
 def retr_fc(pridata, secdata, perc_max=99, sza_thresh=70.):

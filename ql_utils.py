@@ -7,7 +7,7 @@ import logging
 import os
 
 def_pvar = ('lat', 'lon', 'cldmask', 'illum', 'solar_zenith_view_no1',
-            'cth', 'cot', 'aot550', 'aer', 'qcflag', 'lsflag', 'niter', 'costjm')
+            'cth', 'cth_uncertainty', 'cot', 'aot550', 'aer', 'qcflag', 'lsflag', 'niter', 'costjm')
 
 def_svar = ('reflectance_in_channel_no_1', 'reflectance_in_channel_no_2',
             'reflectance_in_channel_no_3', 'brightness_temperature_in_channel_no_9')
@@ -63,7 +63,8 @@ class QuickLookOpts:
                  platform='',
                  varname='',
                  cmap=cm.viridis,
-                 add_coast=False):
+                 add_coast=False,
+                 fill_value=-1):
         # Directory containing the ORAC pri + sec files
         self.indir = indir
         # Top level directory for the output files
@@ -75,6 +76,7 @@ class QuickLookOpts:
         # Timeslot to search for, YYYYMMDDHHMM
         self.dtstr = in_dtstr
         self.dater = datetime.strptime(self.dtstr, "%Y%m%d%H%M")
+        self.subdir = self.dater.strftime("%Y/%m/%d/")
 
         # Whether to overwrite files
         self.clobber = clobber
@@ -150,6 +152,9 @@ class QuickLookOpts:
 
         # Flag for whether we plot coastlines
         self.add_coast = add_coast
+
+        # Set the fill value for filtering data
+        self.fill_value = fill_value
 
 
 def load_orac(in_file, var_list, flipper):
@@ -244,13 +249,3 @@ def test_files(fdict):
         return True
     else:
         return False
-
-
-def apply_basic_qc(pri_data):
-    """Apply basic QC to data and filter out bad pixels.
-    Inputs
-        -    pri_data: Dict, data from ORAC primary file.
-    Returns
-        -    pri_data: Dict, same data but with QC applied.
-        """
-    return None

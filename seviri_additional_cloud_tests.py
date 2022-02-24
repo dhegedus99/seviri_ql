@@ -1,3 +1,5 @@
+from scipy.ndimage.filters import generic_filter
+from scipy.signal import convolve2d
 from numba import jit, prange
 import numpy as np
 import logging
@@ -25,14 +27,31 @@ def _bit_check(var, bit_n):
     return (var & (1 << bit_n)) > 0
 
 
-def fmi_cloud_qc_1km():
-    return
-    raise NotImplementedError('Currently fmi_cloud_qc_1km is not implemented')
+def fmi_cloud_qc_1km(cld_data, aod_data, winsize=3, aot_thresh=0.1, tot_thresh=3):
+    """Find cloud edges"""
+
+    kernel = np.ones((winsize, winsize))
+    totals = convolve2d(cld_data, kernel, mode='same', boundary='fill', fillvalue=0)
+
+    edge = np.where((totals > tot_thresh) & (totals < 9), 1, 0)
+    aod_data = np.copy(aod_data)
+    aod_data = np.where(aod_data > 0, aod_data, np.nan)
+    stdev = generic_filter(aod_data, np.nanstd, size=winsize)
+
+    aod_stdv = np.where(stdev > aot_thresh, 1, 0)
+
+    return edge, aod_stdv
 
 
-def opening_test():
-    return
-    raise NotImplementedError('Currently opening_test is not implemented')
+def opening_test(data, thresh, winsize=5):
+    """Run the opening test"""
+    from cv2 import morphologyEx, MORPH_TOPHAT
+
+    kernel = np.ones((winsize, winsize))
+    tmp = np.where(data <= 0, 0, data)
+    opening = morphologyEx(tmp, MORPH_TOPHAT, kernel)
+    test = opening >= (thresh / 255.)
+    return test
 
 
 @jit(nopython=True)
@@ -53,6 +72,15 @@ def _sort_window(inidx, winsize, ranger, imsize):
         a2 = winsize - 1
 
     return int(b1), int(b2), int(a1), int(a2)
+
+
+def _make_gdal(fname, data):
+    from osgeo import gdal
+    shaper = data.shape
+    output_raster = gdal.GetDriverByName('GTiff').Create(fname, shaper[1], shaper[0], 1, gdal.GDT_Float32)
+    output_raster.GetRasterBand(1).WriteArray(data)
+    output_raster.FlushCache()
+    del output_raster
 
 
 @jit(nopython=True)
@@ -89,8 +117,7 @@ def orac_1km_dist_to_cloud(cld, qual, window=31, nx=False, ny=False):
 
 def seviri_additional_cloud_tests(data_dict,
                                   qcselection=284,
-                                  dist2cld=3,
-                                  minclr=5):
+                                  dist2cld=3):
     """Apply extra cloud / QC filtering to the ORAC data.
     Inputs:
         -   Stuff
@@ -129,44 +156,79 @@ def seviri_additional_cloud_tests(data_dict,
     # have an AOD standard deviation gt 0.1
     if _bit_check(qcselection, bits['cld_edge']) or _bit_check(qcselection, bits['sd_aod']):
         logging.info(f'Applying cloud edge and AOD smoothness tests.')
-        fmi_cloud_qc_1km()
-
-    # The 1 km data seems to have a lot of residual cloud "speckle", which
-    # looks like so called "salt noise" in the AOD imagery... deal with it
-    # using the morphological opening transformation to highlight and
-    # remove this noise
-    if _bit_check(qcselection, bits['aod_open']):
-        logging.info(f'Applying AOD opening test.')
-        opening_test()
-    # If required, do same for effective radius data
-    if _bit_check(qcselection, bits['ref_open']):
-        logging.info(f'Applying ref opening test.')
-        opening_test()
+        edge, aod_stdv = fmi_cloud_qc_1km(cld, data_dict['aot550'])
 
     # Create and set up new QA datalayer
     qual_arr = np.zeros_like(data_dict['qcflag'])
-    if _bit_check(qcselection, bits['conv']):
-        qual_arr = qual_arr + (data_dict['niter'] * bit_vals['conv'])
-    if _bit_check(qcselection, bits['cost']):
-        qual_arr = qual_arr + (data_dict['costjm'] * bit_vals['cost'])
-    if _bit_check(qcselection, bits['cld_edge']):
-        qual_arr = qual_arr + (data_dict['niter'] * bit_vals['cld_edge'])
-    if _bit_check(qcselection, bits['sd_aod']):
-        qual_arr = qual_arr + (data_dict['niter'] * bit_vals['sd_aod'])
-    if _bit_check(qcselection, bits['aod_open']):
-        qual_arr = qual_arr + (data_dict['niter'] * bit_vals['aod_open'])
-    if _bit_check(qcselection, bits['ref_open']):
-        qual_arr = qual_arr + (data_dict['niter'] * bit_vals['ref_open'])
 
-    # Perform cloud distance parameter
+    if _bit_check(qcselection, bits['conv']):
+        tmparr = np.where(data_dict['niter'] > 25, 1, 0)
+        qual_arr = qual_arr + (tmparr * bit_vals['conv'])
+
+    if _bit_check(qcselection, bits['cost']):
+        tmparr = np.where(data_dict['costjm'] > 3, 1, 0)
+        qual_arr = qual_arr + (tmparr * bit_vals['cost'])
+
+    if _bit_check(qcselection, bits['cld_edge']):
+        qual_arr = qual_arr + (edge * bit_vals['cld_edge'])
+
+    if _bit_check(qcselection, bits['sd_aod']):
+        qual_arr = qual_arr + (aod_stdv * bit_vals['sd_aod'])
+
+    if _bit_check(qcselection, bits['aod_open']):
+        logging.info(f'Applying AOD opening test.')
+        aod_open = opening_test(data_dict['aot550'], 80)
+        qual_arr = qual_arr + (aod_open * bit_vals['aod_open'])
+
+    if _bit_check(qcselection, bits['ref_open']):
+        logging.info(f'Applying ref opening test.')
+        ref_open = opening_test(data_dict['aer'], 300)
+        qual_arr = qual_arr + (ref_open * bit_vals['ref_open'])
+
+    # Compute cloud distance parameter
     if dist2cld > 0:
         clddist = orac_1km_dist_to_cloud(cld, qual_arr, window=2*dist2cld+1)
         clddist = np.where(clddist < dist2cld, clddist, 0)
+        clddist = np.where(clddist > 0, 1, 0)
         data_dict['clddist'] = clddist
 
     if _bit_check(qcselection, bits['cld_dist']):
         qual_arr = qual_arr + (data_dict['clddist'] * bit_vals['cld_dist'])
-
     data_dict['qcflag'] = data_dict['qcflag'] + 64 * qual_arr
+    data_dict['qcflag'] = data_dict['qcflag'].astype(np.uint32)
     return data_dict
 
+
+def apply_filters(pri_data, opts):
+    """Apply filters to data to remove bad pixels"""
+
+    # Filter CTH
+    cth_thresh = 0.5  # Min CTH to pass
+    pri_data['cth'] = np.where(pri_data['cldmask'] == 1, pri_data['cth'], -999)
+    pri_data['cth'] = np.where(pri_data['cth'] >= cth_thresh, pri_data['cth'], -999)
+
+    # Filter dCTH
+    cth_thresh2 = 0
+    pri_data['cth_uncertainty'] = np.where(pri_data['cth'] > cth_thresh2, pri_data['cth_uncertainty'], -999)
+    pri_data['cth_uncertainty'] = np.where(pri_data['illum'] != 2, pri_data['cth_uncertainty'], -999)
+    pri_data['cth_uncertainty'] = np.where(pri_data['cldmask'] == 1, pri_data['cth_uncertainty'], -999)
+
+    # Filter COT
+    cot_thresh = 0.
+    _make_gdal('E:/cot_orig.tif', pri_data['cot'])
+    pri_data['cot'] = np.where(pri_data['cldmask'] == 1, pri_data['cot'], -999)
+    _make_gdal('E:/cot_1.tif', pri_data['cot'])
+    pri_data['cot'] = np.where(pri_data['cot'] > cot_thresh, pri_data['cot'], -999)
+    _make_gdal('E:/cot_2.tif', pri_data['cot'])
+    pri_data['cot'] = np.where(pri_data['illum'] == 1, pri_data['cot'], -999)
+    _make_gdal('E:/cot_3.tif', pri_data['cot'])
+
+    # Filter AOD
+    if opts.aerosol_qc is not None:
+        aod_thresh = 0
+        pri_data['aot550'] = np.where(pri_data['cldmask'] == 0, pri_data['aot550'], -999)
+        pri_data['aot550'] = np.where(pri_data['aot550'] > aod_thresh, pri_data['aot550'], -999)
+        pri_data['aot550'] = np.where(pri_data['illum'] == 1, pri_data['aot550'], -999)
+        pri_data['aot550'] = np.where(np.bitwise_and(pri_data['qcflag'], 3328), -999, pri_data['aot550'])
+
+    return pri_data

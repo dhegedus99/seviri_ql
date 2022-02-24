@@ -7,6 +7,7 @@ from glob import glob
 import ql_utils
 import warnings
 import logging
+import sys
 
 start_time = datetime.utcnow()
 
@@ -20,8 +21,8 @@ def main(opts):
     logging.info(f'Beginning processing for {opts.dater.strftime("%Y-%m-%d %H:%M")}')
 
     # Locate primary and secondary files
-    inf_pri = glob(f'{opts.indir}/*{opts.dtstr}*.primary.nc')
-    inf_sec = glob(f'{opts.indir}/*{opts.dtstr}*.secondary.nc')
+    inf_pri = glob(f'{opts.indir}/{opts.subdir}/*{opts.dtstr}*.primary.nc')
+    inf_sec = glob(f'{opts.indir}/{opts.subdir}/*{opts.dtstr}*.secondary.nc')
 
     # Check that files exist, raise error if not
     if len(inf_pri) < 1:
@@ -66,6 +67,8 @@ def main(opts):
         logging.info(f'Applying additional aerosol quality filtering.')
         pri_data = extra_tests.seviri_additional_cloud_tests(pri_data, opts.aerosol_qc, opts.dist2cloud)
 
+    pri_data = extra_tests.apply_filters(pri_data, opts)
+
     # False color image
     # Get the output data scaled into byte range
     odata_fc = sev_plot.retr_fc(pri_data, sec_data, opts.perc_max, opts.sza_thresh)
@@ -104,11 +107,12 @@ def main(opts):
     sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
 
 
-# main_opts = ql_utils.QuickLookOpts(coast_dir='C:/Users/EUMETCAST#/Documents/coast/', res_meth='bilin')
-main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin')
+if len(sys.argv) < 2:
+    raise ValueError("You did not supply a datetime for processing. Please supply as command line argument in the "
+                     "format YYYYmmddHHMM.")
+in_dt = sys.argv[1]
 
+main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin', in_dtstr=in_dt)
 main(main_opts)
-
 end_time = datetime.utcnow()
-
 print(f'Time taken: {(end_time - start_time).total_seconds():5.3f} sec')
