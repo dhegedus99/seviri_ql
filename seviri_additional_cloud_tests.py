@@ -215,13 +215,9 @@ def apply_filters(pri_data, opts):
 
     # Filter COT
     cot_thresh = 0.
-    _make_gdal('E:/cot_orig.tif', pri_data['cot'])
     pri_data['cot'] = np.where(pri_data['cldmask'] == 1, pri_data['cot'], -999)
-    _make_gdal('E:/cot_1.tif', pri_data['cot'])
     pri_data['cot'] = np.where(pri_data['cot'] > cot_thresh, pri_data['cot'], -999)
-    _make_gdal('E:/cot_2.tif', pri_data['cot'])
     pri_data['cot'] = np.where(pri_data['illum'] == 1, pri_data['cot'], -999)
-    _make_gdal('E:/cot_3.tif', pri_data['cot'])
 
     # Filter AOD
     if opts.aerosol_qc is not None:
