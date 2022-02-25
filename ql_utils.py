@@ -36,7 +36,8 @@ def limdict(min_aod=0.01,
 class QuickLookOpts:
     def __init__(self,
                  in_dtstr='202109101100',
-                 indir='./',
+                 indir='/gws/nopw/j04/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
+                 cache_dir='/gws/nopw/j04/rsgnceo/proud/Software/seviri_ql/cache_dir/',
                  outdir_top='./TEST/',
                  coast_dir=None,
                  clobber=False,
@@ -46,14 +47,14 @@ class QuickLookOpts:
                  cesium=True,
                  flip_data=True,
                  auto_out=True,
-                 out_img_pix=(1700, 597),
+                 out_img_pix=(1420, 601),
                  out_img_scl_cs=(358, 192),
-                 out_img_ll=(-71.8154, 29.1062, 30.1846, 64.7465),
+                 out_img_ll=(-55, 29, 30, 65),
                  pvar=def_pvar,
                  svar=def_svar,
                  sza_thresh=70.,
                  perc_max=99.,
-                 res_meth='bilin',
+                 res_meth='nearest',
                  logscl=False,
                  keyticks=None,
                  keytitle='',
@@ -72,6 +73,9 @@ class QuickLookOpts:
 
         # Directory containing coastline shapefiles
         self.coast_dir = coast_dir
+        
+        # Directory to store resampling cache, speeds up subsequent runs
+        self.cache_dir = cache_dir
 
         # Timeslot to search for, YYYYMMDDHHMM
         self.dtstr = in_dtstr

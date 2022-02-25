@@ -112,7 +112,7 @@ if len(sys.argv) < 2:
                      "format YYYYmmddHHMM.")
 in_dt = sys.argv[1]
 
-main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilin', in_dtstr=in_dt)
+main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilinear', in_dtstr=in_dt)
 main(main_opts)
 end_time = datetime.utcnow()
 print(f'Time taken: {(end_time - start_time).total_seconds():5.3f} sec')
