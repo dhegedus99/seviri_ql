@@ -39,6 +39,7 @@ class QuickLookOpts:
                  indir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
                  cache_dir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/cache_dir/',
                  outdir_top='./TEST/',
+                 #outdir_top='/gws/pw/j07/rsgnceo/public/nrt/nrt_part_seviri_msg3/quick_look_cesium//',
                  coast_dir=None,
                  clobber=False,
                  aerosol_qc=284,
