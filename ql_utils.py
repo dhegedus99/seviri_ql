@@ -11,6 +11,8 @@ def_pvar = ('lat', 'lon', 'cldmask', 'illum', 'solar_zenith_view_no1',
 
 def_svar = ('reflectance_in_channel_no_1', 'reflectance_in_channel_no_2',
             'reflectance_in_channel_no_3', 'brightness_temperature_in_channel_no_9')
+            
+def_fvar = ('toa_swdn', 'toa_swup', 'toa_lwup', 'boa_swdn', 'boa_swup', 'boa_lwup', 'boa_lwdn')
 
 
 def limdict(min_aod=0.01,
@@ -53,6 +55,7 @@ class QuickLookOpts:
                  out_img_ll=(-55, 29, 30, 65),
                  pvar=def_pvar,
                  svar=def_svar,
+                 fvar=def_fvar,
                  sza_thresh=70.,
                  perc_max=99.,
                  res_meth='nearest',
@@ -118,6 +121,9 @@ class QuickLookOpts:
 
         # List of variables to be read from secondary file
         self.svar = svar
+        
+        # List of variables to be read from flux file
+        self.fvar = fvar
 
         # Solar zenith threshold for merging false color + IR data
         self.sza_thresh = sza_thresh
@@ -216,6 +222,25 @@ def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 
      - need_proc: Boolean, do we need to do processing. False if all files already present."""
     # Find base filename
     base_fname = os.path.basename(pri_fname)
+    pos = base_fname.find('SEVIRI_ORAC_MSG')
+    dtstr = base_fname[pos + offset:pos + offset + 12]
+    out_fnames = {}
+    for var in var_out_list:
+        out_fnames[var] = f'{odir}/{dtstr}_{var}.png'
+    return out_fnames
+    
+def set_output_files_flux_ql(odir, flx_fname, offset=17, var_out_list=('toa_swdn', 'toa_swup', 'toa_lwup', 'boa_swdn', 'boa_swup', 'boa_lwup', 'boa_lwdn')):
+    """Define and create output filenames for quicklooks based on the date.
+    Inputs:
+     - odir: String, output directory.
+     - pri_fname: String, the filename of the ORAC primary file.
+     - offset: Int, filename position offset from 'SEVIRI_ORAC' that gives timestamp.
+     - var_out_list: List of strings, variables to save.
+    Returns:
+     - out_fnames: Dictionary, output filenames for saving.
+     - need_proc: Boolean, do we need to do processing. False if all files already present."""
+    # Find base filename
+    base_fname = os.path.basename(flx_fname)
     pos = base_fname.find('SEVIRI_ORAC_MSG')
     dtstr = base_fname[pos + offset:pos + offset + 12]
     out_fnames = {}

@@ -19,11 +19,12 @@ logging.basicConfig(filename=logfile, filemode='w', level=logging.DEBUG)
 
 def main(opts):
     logging.info(f'Beginning processing for {opts.dater.strftime("%Y-%m-%d %H:%M")}')
-
+    
     # Locate primary and secondary files
     inf_pri = glob(f'{opts.indir}/{opts.subdir}/*{opts.dtstr}*.primary.nc')
     inf_sec = glob(f'{opts.indir}/{opts.subdir}/*{opts.dtstr}*.secondary.nc')
-
+    inf_flx = glob(f'{opts.indir}/{opts.subdir}/*{opts.dtstr}*.bugsrad.nc')[0]
+    
     # Check that files exist, raise error if not
     if len(inf_pri) < 1:
         raise OSError(f"Error: Cannot find primary file for {opts.dtstr}!")
@@ -43,20 +44,23 @@ def main(opts):
     outdir = ql_utils.set_output_dir(opts.outdir_top, opts.dater)
     # Set output filenames
     outfiles_ql = ql_utils.set_output_files_ql(outdir, inf_pri)
+    outfiles_flx_ql = ql_utils.set_output_files_flux_ql(outdir, inf_flx)
     outfiles_cs = ql_utils.set_output_files_cs(outdir, inf_pri)
 
     # Are files present? If so, no need to process
-    all_done = ql_utils.test_files({**outfiles_ql, **outfiles_cs})
+    all_done = ql_utils.test_files({**outfiles_ql, **outfiles_flx_ql, **outfiles_cs})
     if all_done:
         logging.info(f'All files are present. Halting processing.')
         return
 
-    # Load the primary and secondary variables from ORAC output
+    # Load the primary and secondary variables from ORAC output #ADDED: Load flux variables from ORAC output
     logging.info(f'Reading primary file: {inf_pri}')
     pri_data, priplat = ql_utils.load_orac(inf_pri, opts.pvar, opts.flip_data)
     logging.info(f'Reading secondary file: {inf_sec}')
     sec_data, secplat = ql_utils.load_orac(inf_sec, opts.svar, opts.flip_data)
-
+    logging.info(f'Reading flux file: {inf_flx}')
+    flx_data, flxplat = ql_utils.load_orac(inf_flx, opts.fvar, opts.flip_data)
+    
     if priplat != secplat:
         raise ValueError("Platforms do not match!", priplat, secplat)
     else:
@@ -106,13 +110,23 @@ def main(opts):
     res_data_cod, res_area = sev_plot.resample_data(pri_data['aot550'], pri_data, opts)
     sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
 
+    # ToA upwelling SW radiation image
+    opts.logscl = False
+    opts.varname = 'toa_swup'
+    opts.title = opts.title_stub + opts.varname
+    opts.keytitle = 'Top of Atmosphere SW radiation'
+    opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
+    print(opts)
+    res_data_cod, res_area = sev_plot.resample_data(flx_data['toa_swup'], pri_data, opts)
+    sev_plot.save_plot_cmap(outfiles_flx_ql[opts.varname], res_data_cod, opts)
 
 if len(sys.argv) < 2:
     raise ValueError("You did not supply a datetime for processing. Please supply as command line argument in the "
                      "format YYYYmmddHHMM.")
 in_dt = sys.argv[1]
-
+print(in_dt)
 main_opts = ql_utils.QuickLookOpts(coast_dir=None, res_meth='bilinear', in_dtstr=in_dt)
+print(main_opts.indir, main_opts.subdir)
 main(main_opts)
 end_time = datetime.utcnow()
 print(f'Time taken: {(end_time - start_time).total_seconds():5.3f} sec')
