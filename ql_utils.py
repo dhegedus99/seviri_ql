@@ -6,29 +6,52 @@ import pathlib
 import logging
 import os
 
-def_pvar = ('lat', 'lon', 'cldmask', 'illum', 'solar_zenith_view_no1',
+def_pvar = ('lat', 'lon', 'cldmask', 'illum', 'solar_zenith_view_no1', 'cer', 'phase',
             'cth', 'cth_uncertainty', 'cot', 'aot550', 'aer', 'qcflag', 'lsflag', 'niter', 'costjm')
 
 def_svar = ('reflectance_in_channel_no_1', 'reflectance_in_channel_no_2',
             'reflectance_in_channel_no_3', 'brightness_temperature_in_channel_no_9')
+            
+def_fvar = ('toa_swdn', 'toa_swup', 'toa_lwup', 'boa_swdn', 'boa_swup', 'boa_lwup', 'boa_lwdn')
 
 
-def limdict(min_aod=0.01,
+def limdict(min_aod=0.,
             max_aod=1.2,
             min_cth=0.02,
             max_cth=15.,
             min_cer=0.,
             max_cer=50.,
-            min_dcth=0,
+            min_dcth=0.,
             max_dcth=10.,
             min_cod=0.1,
-            max_cod=100.):
+            max_cod=100.,
+            min_toa_swdn=0, 
+            max_toa_swdn=1250, #check these
+            min_toa_swup=0, 
+            max_toa_swup=900,
+            min_toa_lwup=100, 
+            max_toa_lwup=350,
+            min_boa_lwdn=200, 
+            max_boa_lwdn=500,
+            min_boa_lwup=200, #check these
+            max_boa_lwup=800,
+            min_boa_swup=0, 
+            max_boa_swup=500,
+            min_boa_swdn=0, 
+            max_boa_swdn=1000):
 
     lim_dict = {'AOD': [min_aod, max_aod],
                 'CTH': [min_cth, max_cth],
                 'CER': [min_cer, max_cer],
                 'COT': [min_cod, max_cod],
-                'dCTH': [min_dcth, max_dcth]}
+                'dCTH': [min_dcth, max_dcth],
+                'toa_swup': [min_toa_swup, max_toa_swup],
+                'toa_swdn': [min_toa_swdn, max_toa_swdn],
+                'toa_lwup': [min_toa_lwup, max_toa_lwup],
+                'boa_swup': [min_boa_swup, max_boa_swup],
+                'boa_swdn': [min_boa_swdn, max_boa_swdn],
+                'boa_lwup': [min_boa_lwup, max_boa_lwup],
+                'boa_lwdn': [min_boa_lwdn, max_boa_lwdn]}
 
     return lim_dict
 
@@ -36,11 +59,13 @@ def limdict(min_aod=0.01,
 class QuickLookOpts:
     def __init__(self,
                  in_dtstr='202109101100',
-                 indir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
+                 use_aerosol = True,
+                 indir='/home/users/dhegedus/seviri_redo/Data/seviri_msg3/nrt_processing/l2b/',
+                 #indir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
                  cache_dir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/cache_dir/',
                  outdir_top='./TEST/',
                  #outdir_top='/gws/pw/j07/rsgnceo/public/nrt/nrt_part_seviri_msg3/quick_look_cesium//',
-                 coast_dir=None,
+                 coast_dir='/home/users/dhegedus/seviri_ql/coast_shp/', 
                  clobber=False,
                  aerosol_qc=284,
                  dist2cloud=3.,
@@ -48,11 +73,13 @@ class QuickLookOpts:
                  cesium=True,
                  flip_data=True,
                  auto_out=True,
-                 out_img_pix=(1420, 601),
+                 out_img_res=0.03,
+                 #out_img_pix=(2840,2170),
                  out_img_scl_cs=(358, 192),
-                 out_img_ll=(-55, 29, 30, 65),
+                 #out_img_ll=(-55, 0, 30, 65),
                  pvar=def_pvar,
                  svar=def_svar,
+                 fvar=def_fvar,
                  sza_thresh=70.,
                  perc_max=99.,
                  res_meth='nearest',
@@ -64,11 +91,16 @@ class QuickLookOpts:
                  outlims=limdict(),
                  platform='',
                  varname='',
-                 cmap=cm.viridis,
-                 add_coast=False,
-                 fill_value=-1):
+                 cmap_cld=cm.viridis,
+                 cldcmappath='/home/users/dhegedus/seviri_ql/cube1_0-1.csv',
+                 cmap_aer=cm.inferno,
+                 add_coast=True,
+                 fill_value=-1,
+                 font='/home/users/dhegedus/seviri_ql/Verdana.ttf'):
         # Directory containing the ORAC pri + sec files
         self.indir = indir
+        self.use_aerosol = use_aerosol
+            
         # Top level directory for the output files
         self.outdir_top = outdir_top
 
@@ -106,18 +138,24 @@ class QuickLookOpts:
 
         # Shall we make subdirectories based on date
         self.auto_out = auto_out
-
+        
+        # Set image output resolution in degrees
+        self.out_img_res = out_img_res
+        
         # Set image output size in pixels
-        self.out_img_pix = out_img_pix
+        #self.out_img_pix = out_img_pix
 
         # Set lat/lon limits of output image
-        self.out_img_ll = out_img_ll
+        #self.out_img_ll = out_img_ll
 
         # List of variables to be read from primary file
         self.pvar = pvar
 
         # List of variables to be read from secondary file
         self.svar = svar
+        
+        # List of variables to be read from flux file
+        self.fvar = fvar
 
         # Solar zenith threshold for merging false color + IR data
         self.sza_thresh = sza_thresh
@@ -153,7 +191,9 @@ class QuickLookOpts:
         self.varname = varname
 
         # Colormap for plotting
-        self.cmap = cmap
+        self.cmap_cld = cmap_cld
+        self.cldcmappath = cldcmappath
+        self.cmap_aer = cmap_aer
 
         # Flag for whether we plot coastlines
         self.add_coast = add_coast
@@ -161,6 +201,8 @@ class QuickLookOpts:
         # Set the fill value for filtering data
         self.fill_value = fill_value
 
+        self.font = font
+        
 
 def load_orac(in_file, var_list, flipper):
     """Read ORAC variables from file into dict.
@@ -192,19 +234,23 @@ def load_orac(in_file, var_list, flipper):
     return var_dict, plat
 
 
-def set_output_dir(odir_top, indate):
+def set_output_dir(odir_top, indate, cesium=True):
     """Define and create output directory based on the date.
     Inputs:
      - outdir_top: String, top-level output directory.
      - indate: Datetime, current processing timeslot.
     Returns:
      - outdir: String, correct directory for saving output."""
-    outdir = f'{odir_top}/{indate.strftime("%Y/%m/%d")}/'
+    if cesium:
+        outdir = f'{odir_top}cesium/{indate.strftime("%Y/%m/%d")}/'
+    else:
+        outdir = f'{odir_top}quicklook/{indate.strftime("%Y/%m/%d")}/'
+        
     pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
     return outdir
 
 
-def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 'dCTH', 'FC')):
+def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 'dCTH', 'FC', 'AOD', 'CER', 'PHS')):
     """Define and create output filenames for quicklooks based on the date.
     Inputs:
      - odir: String, output directory.
@@ -216,15 +262,53 @@ def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 
      - need_proc: Boolean, do we need to do processing. False if all files already present."""
     # Find base filename
     base_fname = os.path.basename(pri_fname)
-    pos = base_fname.find('SEVIRI_ORAC_MSG')
-    dtstr = base_fname[pos + offset:pos + offset + 12]
+    pos = base_fname.find('.primary.nc')
+    base_fname = base_fname[:pos]
     out_fnames = {}
     for var in var_out_list:
-        out_fnames[var] = f'{odir}/{dtstr}_{var}.png'
+        out_fnames[var] = f'{odir}/{base_fname}_{var}.png'
+    return out_fnames
+    
+def set_output_files_flux_ql(odir, flx_fname, offset=17, var_out_list=('toa_swdn', 'toa_swup', 'toa_lwup', 'boa_swdn', 'boa_swup', 'boa_lwup', 'boa_lwdn')):
+    """Define and create output filenames for quicklooks based on the date.
+    Inputs:
+     - odir: String, output directory.
+     - pri_fname: String, the filename of the ORAC primary file.
+     - offset: Int, filename position offset from 'SEVIRI_ORAC' that gives timestamp.
+     - var_out_list: List of strings, variables to save.
+    Returns:
+     - out_fnames: Dictionary, output filenames for saving.
+     - need_proc: Boolean, do we need to do processing. False if all files already present."""
+    # Find base filename
+    base_fname = os.path.basename(flx_fname)
+    pos = base_fname.find('.bugsrad.nc')
+    base_fname = base_fname[:pos]
+    out_fnames = {}
+    for var in var_out_list:
+        out_fnames[var] = f'{odir}/{base_fname}_{var}.png'
+    return out_fnames
+
+def set_output_files_flux_cs(odir, flx_fname, var_out_list=('toa_swdn', 'toa_swup', 'toa_lwup', 'boa_swdn', 'boa_swup', 'boa_lwup', 'boa_lwdn')):
+    """Define and create output filenames for cesium based on the date.
+    Inputs:
+     - odir: String, output directory.
+     - pri_fname: String, the filename of the ORAC primary file.
+     - var_out_list: List of strings, variables to save.
+    Returns:
+     - out_fnames: Dictionary, output filenames for saving.
+     - need_proc: Boolean, do we need to do processing. False if all files already present."""
+
+    # Find base filename
+    base_fname = os.path.basename(flx_fname)
+    pos = base_fname.find('.bugsrad.nc')
+    base_fname = base_fname[:pos]
+    out_fnames = {}
+    for var in var_out_list:
+        out_fnames[var] = f'{odir}/{base_fname}_{var}.png'
     return out_fnames
 
 
-def set_output_files_cs(odir, pri_fname, var_out_list=('CTH', 'COT', 'FC', 'AOD')):
+def set_output_files_cs(odir, pri_fname, var_out_list=('CTH', 'COT', 'FC', 'AOD', 'CER', 'PHS')):
     """Define and create output filenames for cesium based on the date.
     Inputs:
      - odir: String, output directory.
@@ -240,7 +324,7 @@ def set_output_files_cs(odir, pri_fname, var_out_list=('CTH', 'COT', 'FC', 'AOD'
     base_fname = base_fname[:pos]
     out_fnames = {}
     for var in var_out_list:
-        out_fnames[var] = f'{odir}/{base_fname}_{var}.png'
+        out_fnames[var] = f'{odir}{base_fname}_{var}.png'
     return out_fnames
 
 
