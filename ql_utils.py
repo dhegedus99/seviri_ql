@@ -60,7 +60,8 @@ class QuickLookOpts:
     def __init__(self,
                  in_dtstr='202109101100',
                  use_aerosol = True,
-                 indir='/home/users/dhegedus/seviri_redo/Data/seviri_msg3/nrt_processing/l2b/',
+                 indir='/gws/pw/j07/rsgnceo/from_j05/public/nrt/nrt_part_seviri_msg3_ext/data/',
+                 #indir='/home/users/dhegedus/seviri_redo/Data/seviri_msg3/nrt_processing/l2b/',
                  #indir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
                  cache_dir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/cache_dir/',
                  outdir_top='./TEST/',
@@ -73,7 +74,7 @@ class QuickLookOpts:
                  cesium=True,
                  flip_data=True,
                  auto_out=True,
-                 out_img_res=0.03,
+                 out_img_res=0.06,
                  #out_img_pix=(2840,2170),
                  out_img_scl_cs=(358, 192),
                  #out_img_ll=(-55, 0, 30, 65),
@@ -95,6 +96,7 @@ class QuickLookOpts:
                  cldcmappath='/home/users/dhegedus/seviri_ql/cube1_0-1.csv',
                  cmap_aer=cm.inferno,
                  add_coast=True,
+                 cbar_path='/gws/pw/j07/rsg_share/public/rsgnceo/nrt/nrt_part_seviri_msg3/quick_look_cesium/colour_bars/',
                  fill_value=-1,
                  font='/home/users/dhegedus/seviri_ql/Verdana.ttf'):
         # Directory containing the ORAC pri + sec files
@@ -197,6 +199,9 @@ class QuickLookOpts:
 
         # Flag for whether we plot coastlines
         self.add_coast = add_coast
+        
+        # Location of colourbar for cesium
+        self.cbar_path = cbar_path
 
         # Set the fill value for filtering data
         self.fill_value = fill_value
@@ -242,15 +247,16 @@ def set_output_dir(odir_top, indate, cesium=True):
     Returns:
      - outdir: String, correct directory for saving output."""
     if cesium:
-        outdir = f'{odir_top}cesium/{indate.strftime("%Y/%m/%d")}/'
+        outdir = f'{odir_top}quick_look_cesium/{indate.strftime("%Y/%m/%d")}/'
     else:
-        outdir = f'{odir_top}quicklook/{indate.strftime("%Y/%m/%d")}/'
+        outdir = f'{odir_top}quick_look_hires/{indate.strftime("%Y/%m/%d")}/'
         
-    pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
+    os.makedirs(outdir, 0o775, exist_ok=True)
+    
     return outdir
 
 
-def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 'dCTH', 'FC', 'AOD', 'CER', 'PHS')):
+def set_output_files_ql(odir, pri_fname, offset=17, var_out_list=('CTH', 'COT', 'dCTH', 'FC', 'AOD', 'CER', 'PHS', 'FC')):
     """Define and create output filenames for quicklooks based on the date.
     Inputs:
      - odir: String, output directory.

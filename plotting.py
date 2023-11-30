@@ -1,4 +1,4 @@
-from pycoast import ContourWriterAGG
+#from pycoast import ContourWriterAGG
 from PIL import Image, ImageOps, ImageFont
 import numpy as np
 import math
@@ -71,31 +71,125 @@ def create_cmap_flx(cmap):
     my_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('flxcmap', new_rows)
     return my_cmap
     
+def colorbar_plotting(opts):
+    fig, ax = plt.subplots(figsize=(1, 3))
+    fig.patch.set_alpha(0)
+    if opts.varname == 'AOD':
+        cur_cmap = assign_cmap_aer()
+    else:
+        cur_cmap = assign_cmap_cld(opts.cldcmappath)
+              
+        if 'toa' in opts.varname or 'boa' in opts.varname:
+            cur_cmap = create_cmap_flx(cur_cmap)
+        cmaplist = [cur_cmap(i) for i in range(cur_cmap.N)]
+        cur_cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
+                      'discmap', cmaplist, (len(opts.keyticks)-1)*2) 
+        
+    if opts.logscl:
+        rng_min = np.log10(opts.outlims[opts.varname][0])
+        rng_max = np.log10(opts.outlims[opts.varname][1])
+        cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=rng_min, vmax=rng_max), cmap=cur_cmap),
+                 cax=ax, orientation='vertical', fraction=100, shrink=1.1, aspect=5)
+        cbar.ax.set_yticks(np.arange(rng_min, rng_max+1, 1), color='white')
+        cbar.ax.set_yticklabels(opts.keyticks, color='white', fontsize=10)
+        cbar.outline.set_edgecolor('white')
+        cbar.outline.set_linewidth(0.5)
+        ax.yaxis.set_ticks_position('left')
+        cbar.ax.tick_params(axis='y',colors='white')
+    else:
+        rng_min = opts.outlims[opts.varname][0]
+        rng_max = opts.outlims[opts.varname][1]
+        print(rng_min, rng_max)
+        print((rng_max-rng_min)/(len(opts.keyticks)-1))
+        print(np.arange(rng_min, rng_max+(rng_max-rng_min)/(len(opts.keyticks)-1), (rng_max-rng_min)/(len(opts.keyticks)-1)))
+        cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=rng_min, vmax=rng_max), cmap=cur_cmap),
+                 cax=ax, orientation='vertical', fraction=100, shrink=1.1, aspect=5)
+        cbar.outline.set_edgecolor('white')
+        cbar.outline.set_linewidth(0.5)
+        cbar.add_lines(levels=np.arange(rng_min, rng_max+(rng_max-rng_min)/(len(opts.keyticks)-1), (rng_max-rng_min)/(len(opts.keyticks)-1)/2), 
+                      colors=np.repeat('white', len(opts.keyticks)*2), 
+                      linewidths=np.repeat(0.5,len(opts.keyticks)*2))
+        ax.yaxis.set_ticks_position('left')
+        cbar.ax.tick_params(axis='y',colors='white')
+        cbar.ax.set_yticks(np.arange(rng_min, rng_max+(rng_max-rng_min)/(len(opts.keyticks)-1), (rng_max-rng_min)/(len(opts.keyticks)-1)), color='white')
+        cbar.ax.set_yticklabels(opts.keyticks, color='white', fontsize=10)
+    
+    fig.tight_layout()
+    fig.savefig(opts.cbar_path+opts.title_stub+opts.varname+'_colourbar.png', bbox_inches='tight', pad_inches = 0)   
+    
+def colorbar_phs_plotting(opts):
+    fig, ax = plt.subplots(figsize=(1, 3))
+    fig.patch.set_alpha(0)
+    cur_cmap = matplotlib.colors.LinearSegmentedColormap.from_list('phasecmap', [[100,0,0], [0,0,100]], 2)
+    cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=matplotlib.colors.Normalize(vmin=0, vmax=1), cmap=cur_cmap),
+             cax=ax, orientation='vertical', fraction=100, shrink=1.1, aspect=5)
+    cbar.outline.set_edgecolor('white')
+    cbar.outline.set_linewidth(0.5)
+    cbar.add_lines(levels=np.arange(0.5, 1, 0.5), 
+                      colors=np.repeat('white',1), 
+                      linewidths=np.repeat(0.5,1))
+    ax.yaxis.set_ticks_position('left')
+    cbar.ax.tick_params(axis='y',colors='white')
+    cbar.ax.set_yticks(np.arange(0.25, 1.25, 0.5), color='white')
+    cbar.ax.set_yticklabels( ['liquid', 'ice'])
+    
+    fig.tight_layout()
+    fig.savefig(opts.cbar_path+opts.title_stub+opts.varname+'_colourbar.png', bbox_inches='tight', pad_inches = 0) 
 
-
-def save_plot_fc(fname, data, opts, area_def, fill_value=-999, addcoast=False):
+def save_plot_fc(fname, data, opts, area_ext, area_def, fill_value=-999, addcoast=False):
     """Save plot-ready false color/phase class data to cesium file."""
     save_fc = make_alpha(data[:, :, ::-1])
     img = Image.fromarray(save_fc)
-    save_fc[:,:,3] = np.where((save_fc[:, :,0]==25) & (save_fc[:, :,1]==25) & (save_fc[:, :,2]==25), 0, 255)
     if addcoast:
         img = Image.fromarray(save_fc)
         cw = ContourWriterAGG(opts.coast_dir)
         cw.add_coastlines(img, area_def, resolution='l', level=4)
         #cw.add_borders(img, area_def)
-    img.save(fname)
+    
+    #img.save(fname)
+    fig, ax = plt.subplots(dpi=300)
+    ax.imshow(img)
+    ax.axis('off')
+    fig.savefig(fname, bbox_inches='tight', transparent=True)
+    return img
+    
+def save_plot_fc_ql(fname, data, opts, im, area_ext):
+    """Save plot-ready phase class data to quicklook file."""
+    import matplotlib.ticker as mticker
+    import matplotlib.patches as mpatches
+    
+    # Set up plot
+    fig, ax = plt.subplots(subplot_kw=dict(projection=ccrs.PlateCarree()))
+    ax.coastlines(lw=0.3, color='r')
+    ax.set_xticks(np.arange(round(area_ext[0].item(),-1),round(area_ext[1].item(), -1),20), crs=ccrs.PlateCarree())
+    ax.set_yticks(np.arange(round(area_ext[2].item(),-1),math.ceil(area_ext[3].item()/10.0)*10,10), crs=ccrs.PlateCarree())
+    lon_formatter = LongitudeFormatter(zero_direction_label=True)
+    lat_formatter = LatitudeFormatter()
+    ax.xaxis.set_major_formatter(lon_formatter)
+    ax.yaxis.set_major_formatter(lat_formatter)
+    ax.set_title(opts.title)
+    
+    # Overlay image of data
+    ax.imshow(im, extent=area_ext)
+    
+    # Save quicklook figure
+    fig.savefig(fname, bbox_inches='tight')
 
 def save_plot_phs(fname, data, opts, area_def, addcoast=False):
     """Save plot-ready phase classification data to file."""
     save_fc = make_alpha(data[:, :, ::-1])
-    save_fc[:,:,3] = np.where((save_fc[:, :,0]==0) & (save_fc[:, :,1]==0) & (save_fc[:, :,2]==0), 0, 255)
-    save_fc[:,:,3] = np.where((save_fc[:, :,0]==25) & (save_fc[:, :,1]==25) & (save_fc[:, :,2]==25), 0, save_fc[:,:,3])
+    save_fc[:,:,3] = np.where((save_fc[:, :,0]==0) & (save_fc[:, :,1]==0) & (save_fc[:, :,2]==0), 0, save_fc[:,:,3])
+    #save_fc[:,:,3] = np.where((save_fc[:, :,0]==25) & (save_fc[:, :,1]==25) & (save_fc[:, :,2]==25), 0, save_fc[:,:,3])
     img = Image.fromarray(save_fc)
     if addcoast:
         cw = ContourWriterAGG(opts.coast_dir)
         cw.add_coastlines(img, area_def, resolution='l', level=4)
         #cw.add_borders(img, area_def)        
-    img.save(fname)
+    #img.save(fname, optimize=True, quality=85)
+    fig, ax = plt.subplots(dpi=300)
+    ax.imshow(img)
+    ax.axis('off')
+    fig.savefig(fname, bbox_inches='tight', transparent=True)
     return img
 
 def save_plot_phs_ql(fname, data, opts, im, area_ext):
@@ -104,8 +198,8 @@ def save_plot_phs_ql(fname, data, opts, im, area_ext):
     import matplotlib.patches as mpatches
     
     # Set up plot
-    fig, ax = plt.subplots(subplot_kw=dict(projection=ccrs.PlateCarree()), dpi=300)
-    cax = fig.add_axes([0.97, 0.275, 0.02, 0.44]) 
+    fig, ax = plt.subplots(subplot_kw=dict(projection=ccrs.PlateCarree()))
+    cax = fig.add_axes([0.97, 0.175, 0.02, 0.64]) 
     ax.coastlines(lw=0.3)
     ax.set_xticks(np.arange(round(area_ext[0].item(),-1),round(area_ext[1].item(), -1),20), crs=ccrs.PlateCarree())
     ax.set_yticks(np.arange(round(area_ext[2].item(),-1),math.ceil(area_ext[3].item()/10.0)*10,10), crs=ccrs.PlateCarree())
@@ -173,7 +267,7 @@ def save_plot_cmap(fname, data, opts, area_ext=None, fill_value=-999, data_filt=
     im[:, :, 3] = mask
     
     if opts.aerosol_landsea:
-        land = regionmask.defined_regions.natural_earth_v5_0_0.land_110
+        land = regionmask.defined_regions.natural_earth_v5_0_0.land_10
         lat = np.linspace(area_ext[2].item(),area_ext[3].item(), data_proc.shape[0])
         lon = np.linspace(area_ext[0].item(),area_ext[1].item(), data_proc.shape[1])
         mask2 = land.mask(lon, lat)
@@ -181,14 +275,19 @@ def save_plot_cmap(fname, data, opts, area_ext=None, fill_value=-999, data_filt=
         
     im[:, :, 3] = mask   
     img = Image.fromarray(im)
-    img.save(fname)
+    #img.save(fname, optimize=True)
+    
+    fig, ax = plt.subplots(dpi=300)
+    ax.imshow(img)
+    ax.axis('off')
+    fig.savefig(fname, bbox_inches='tight', transparent=True)
     return im
     
 def save_plot_cmap_ql(fname, data, opts, im, area_ext):
     """Save plot-ready AOD/clouddata to quicklook file."""
     import matplotlib.ticker as mticker
-    fig, ax = plt.subplots(subplot_kw=dict(projection=ccrs.PlateCarree()), dpi=300)
-    cax = fig.add_axes([0.97, 0.275, 0.02, 0.44]) 
+    fig, ax = plt.subplots(subplot_kw=dict(projection=ccrs.PlateCarree()))
+    cax = fig.add_axes([0.97, 0.175, 0.02, 0.64]) 
     ax.coastlines(lw=0.3)
     ax.set_xticks(np.arange(round(area_ext[0].item(),-1),round(area_ext[1].item(), -1),20), crs=ccrs.PlateCarree())
     ax.set_yticks(np.arange(round(area_ext[2].item(),-1),math.ceil(area_ext[3].item()/10.0)*10,10), crs=ccrs.PlateCarree())
@@ -286,9 +385,9 @@ def retr_phs(pridata):
     b2 = pridata['phase']
     b3 = pridata['phase']
 
-    b1 = np.where(b1==2, 1, 0)
-    b2 = np.where(b2==0, np.nan, 0)
-    b3 = np.where(b3==1, 1, 0)
+    b1 = np.where(b1==2, 1, 0) #Blue = ice
+    b2 = np.where(b2==0, np.nan, 0) #Green = clear
+    b3 = np.where(b3==1, 1, 0) #Red = liquid
     
     
     img = np.dstack((b1, b2, b3))
@@ -313,7 +412,6 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
     from pyresample import create_area_def, geometry, image
     from satpy import resample
     import xarray as xr
-
     lats = pridata['lat']
     lats = np.where(lats > -90, lats, 180.)
     lats = np.where(np.isfinite(lats), lats, 380.)
@@ -327,6 +425,7 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
     lat_min = lats.min().values
     lon_max = lons.max().values
     lon_min = lons.min().values
+    print(lon_min, lon_max, lat_min, lat_max)
     pix_height = math.floor((lat_max-lat_min)/opts.out_img_res)
     pix_width = math.floor((lon_max-lon_min)/opts.out_img_res)
     
@@ -369,6 +468,7 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
         res = np.dstack((res1, res2, res3))
     else:
         data_xr = xr.DataArray(indata[:,:], dims=["y", "x"])
+        
         res = resample.resample(indata_def,
                                 data_xr,
                                 area_def,
@@ -377,7 +477,6 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
                                 radius_of_influence=roi,
                                 fill_value=fill_value,
                                 cache_dir=opts.cache_dir)
-
 
     return res, area_def, (lon_min, lon_max, lat_min, lat_max)
 '''
@@ -421,7 +520,7 @@ def resample_data(indata, pridata, opts, roi=50000):
     return result, area_def
 '''
 
-def make_alpha(inarr, mask_val=0):
+def make_alpha(inarr, fill_value=-999):
     """Add an alpha channel to a numpy array.
     Inputs:
         -   inarr: Numpy array, the original data to mask.
@@ -430,6 +529,6 @@ def make_alpha(inarr, mask_val=0):
         -   outarr: Numpy array, input data with extra dimension for mask."""
     # Assume RGB if multiple bands
     if len(inarr.shape) > 2:
-        mask = ~np.all(inarr == [mask_val, mask_val, mask_val], axis=-1)
+        mask = ~np.all(inarr == [fill_value, fill_value, fill_value], axis=-1)
     outarr = np.dstack((inarr, mask.astype(np.uint8) * 255.)).astype(np.uint8)
     return outarr

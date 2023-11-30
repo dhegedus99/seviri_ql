@@ -25,13 +25,13 @@ def main(opts):
     logging.info(f'Beginning processing for {opts.dater.strftime("%Y-%m-%d %H:%M")}')
     
     # Locate primary and secondary files
-    if opts.use_aerosol:
-            opts.indir+='withaer'
-    else:
-            opts.indir+='noaer'
+    #if opts.use_aerosol:
+    #        opts.indir+='withaer'
+    #else:
+    #        opts.indir+='noaer'
     inf_pri = glob(f'{opts.indir}/{opts.subdir}*{opts.dtstr}*.primary.nc')
     inf_sec = glob(f'{opts.indir}/{opts.subdir}*{opts.dtstr}*.secondary.nc')
-    inf_flx = glob(f'{opts.indir}/{opts.subdir}*{opts.dtstr}*.bugsrad.nc')[0]
+    inf_flx = glob(f'{opts.indir}/{opts.subdir}*{opts.dtstr}*.bugsrad.nc')#[0]
     
     # Check that files exist, raise error if not
     if len(inf_pri) < 1:
@@ -42,6 +42,10 @@ def main(opts):
         raise OSError(f"Error: Cannot find secondary file for {opts.dtstr}!")
     else:
         inf_sec = inf_sec[0]
+    if len(inf_flx) < 1:
+        raise OSError(f"Error: Cannot find flux file for {opts.dtstr}!")
+    else:
+        inf_flx = inf_flx[0]
 
     logging.info(f'SEVIRI_MK_NRT_QUICKLOOKS: directories')
     logging.info(f' - Input: {opts.indir}')
@@ -51,6 +55,7 @@ def main(opts):
     logging.info(f'Setting output files and directories')
     outdir_cs = ql_utils.set_output_dir(opts.outdir_top, opts.dater, cesium=True)
     outdir_ql = ql_utils.set_output_dir(opts.outdir_top, opts.dater, cesium=False)
+    print(glob(outdir_cs))
     # Set output filenames
     outfiles_ql = ql_utils.set_output_files_ql(outdir_ql, inf_pri)
     outfiles_flx_cs = ql_utils.set_output_files_flux_cs(outdir_cs, inf_flx)
@@ -91,9 +96,10 @@ def main(opts):
     # Find area definition, needed for coastlines
     area_def = (res_area.proj4_string, res_area.area_extent)
     # Save the output to disk
-    sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def)
+    im = sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def, area_ext)
+    sev_plot.save_plot_fc_ql(outfiles_ql['FC'], res_data_fc, opts, im, area_ext)
     #sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def, addcoast=True)
-    
+    print('Start phase')
     # Phase image
     # Get the output data scaled into byte range
     odata_phs = sev_plot.retr_phs(pri_data)
@@ -102,7 +108,7 @@ def main(opts):
     # Save the output to disk
     im = sev_plot.save_plot_phs(outfiles_cs['PHS'], res_data_phs, opts, area_def)
     sev_plot.save_plot_phs_ql(outfiles_ql['PHS'], res_data_phs, opts, im, area_ext)
-
+    print('Start Clouds')
     # Cloud top height image
     opts.logscl = False
     opts.varname = 'CTH'
@@ -146,7 +152,7 @@ def main(opts):
     res_data_cod, res_area, area_ext = sev_plot.resample_data(pri_data['aot550'], pri_data, opts)
     im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, area_ext=area_ext)
     sev_plot.save_plot_cmap_ql(outfiles_ql[opts.varname], res_data_cod, opts, im, area_ext)
-
+    print('Start Fluxes')
     # ToA upwelling SW radiation image
     opts.logscl = False
     opts.varname = 'toa_swup'
@@ -223,6 +229,7 @@ def main(opts):
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['boa_lwdn'], pri_data, opts)
     im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
+    print('End fluxes')
     
 
 if len(sys.argv) < 2:
