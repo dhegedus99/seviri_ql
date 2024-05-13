@@ -60,7 +60,7 @@ class QuickLookOpts:
     def __init__(self,
                  in_dtstr='202109101100',
                  use_aerosol = True,
-                 indir='/gws/pw/j07/rsgnceo/from_j05/public/nrt/nrt_part_seviri_msg3_ext/data/',
+                 indir='/gws/pw/j07/rsgnceo/from_j05/public/nrt/nrt_part_seviri_msg3_ext/data/lv2/',
                  #indir='/home/users/dhegedus/seviri_redo/Data/seviri_msg3/nrt_processing/l2b/',
                  #indir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/l2b/',
                  cache_dir='/gws/pw/j07/rsgnceo/Data/seviri_msg3/nrt_processing/cache_dir/',
@@ -249,6 +249,7 @@ def set_output_dir(odir_top, indate, cesium=True):
     if cesium:
         outdir = f'{odir_top}quick_look_cesium/{indate.strftime("%Y/%m/%d")}/'
     else:
+        #outdir = f'/gws/pw/j07/rsgnceo/from_j05/public/nrt/nrt_part_seviri_msg3_ext/quick_look_hires/{indate.strftime("%Y/%m/%d")}/'
         outdir = f'{odir_top}quick_look_hires/{indate.strftime("%Y/%m/%d")}/'
         
     os.makedirs(outdir, 0o775, exist_ok=True)

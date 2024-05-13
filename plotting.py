@@ -136,9 +136,20 @@ def colorbar_phs_plotting(opts):
     fig.tight_layout()
     fig.savefig(opts.cbar_path+opts.title_stub+opts.varname+'_colourbar.png', bbox_inches='tight', pad_inches = 0) 
 
-def save_plot_fc(fname, data, opts, area_ext, area_def, fill_value=-999, addcoast=False):
+def save_plot_fc(fname, data, opts, area_ext, area_def, latmask, fill_value=np.nan, addcoast=False):
     """Save plot-ready false color/phase class data to cesium file."""
+    print('start fc')
     save_fc = make_alpha(data[:, :, ::-1])
+    mask = np.where((latmask>=0) | (np.isnan(latmask)), 0, 255)
+    plt.figure()
+    plt.imshow(latmask)
+    plt.figure()
+    plt.imshow(mask)
+    mask = np.where(np.isfinite(save_fc[:,:,0]), mask, 0)
+    plt.figure()
+    plt.imshow(mask)
+    save_fc[:,:,3] = mask
+    #save_fc[:,:,3] = np.where((save_fc[:, :,0]==0) & (save_fc[:, :,1]==0) & (save_fc[:, :,2]==0), 0, save_fc[:,:,3])
     img = Image.fromarray(save_fc)
     if addcoast:
         img = Image.fromarray(save_fc)
@@ -151,6 +162,7 @@ def save_plot_fc(fname, data, opts, area_ext, area_def, fill_value=-999, addcoas
     ax.imshow(img)
     ax.axis('off')
     fig.savefig(fname, bbox_inches='tight', transparent=True)
+    #plt.show()
     return img
     
 def save_plot_fc_ql(fname, data, opts, im, area_ext):
@@ -222,12 +234,14 @@ def save_plot_phs_ql(fname, data, opts, im, area_ext):
         
         
 
-def save_plot_cmap(fname, data, opts, area_ext=None, fill_value=-999, data_filt=None):
+def save_plot_cmap(fname, data, opts, latmask, area_ext=None, fill_value=np.nan, data_filt=None):
     """Save plot-ready AOD/cloud data to cesium file."""
     data_proc = np.copy(data)
     
     if data_filt is not None:
         data_proc = np.where(data_filt == 0, data_proc, fill_value)
+    if opts.varname == 'CER':
+        data_proc = np.where(data_proc>0, data_proc, fill_value)
     
     # Get the colormap
     if opts.varname == 'AOD':
@@ -251,21 +265,25 @@ def save_plot_cmap(fname, data, opts, area_ext=None, fill_value=-999, data_filt=
 
     # Set data lims for plotting and init mask
     #mask = data_proc.copy()
-    data_proc = np.where(data_proc < 0, fill_value, data_proc)
+    if 'sw' in opts.varname:
+        data_proc = np.where(data_proc <= 0, fill_value, data_proc)
+    else:
+        data_proc = np.where(data_proc < 0, fill_value, data_proc)
     data_proc = np.where((data_proc < rng_min) & (data_proc > 0), rng_min, data_proc)
     data_proc = np.where(data_proc > rng_max, rng_max, data_proc)
     mask = data_proc.copy()
     # Populate mask
-    mask = np.where(mask == fill_value, 0, 255)
     
+    mask = np.where(latmask>=0, 0, 255)
     # Normalise data
     data_proc = data_proc / rng_max
     
     
     # Make the image and save
     im = np.uint8(cur_cmap(data_proc) * 255)
+    mask = np.where((im[:,:,0]==0) & (im[:,:,1]==0) & (im[:,:,2]==0), 0, mask)
     im[:, :, 3] = mask
-    
+    #im[:,:,3] = np.where((im[:, :,0]==0) & (im[:, :,1]==0) & (im[:, :,2]==0), 0, im[:,:,3])
     if opts.aerosol_landsea:
         land = regionmask.defined_regions.natural_earth_v5_0_0.land_10
         lat = np.linspace(area_ext[2].item(),area_ext[3].item(), data_proc.shape[0])
@@ -398,7 +416,7 @@ def retr_phs(pridata):
     img = img.astype(np.ubyte)
     return img
 
-def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
+def resample_data(indata, pridata, opts, roi=50000, fill_value=np.nan):
     """Transform raw SEVIRI data into required output projection.
     Inputs:
         -   indata: 2d or 3d numpy array, ORAC/false colour data in native projection.
@@ -412,6 +430,25 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
     from pyresample import create_area_def, geometry, image
     from satpy import resample
     import xarray as xr
+    
+    lats = pridata['lat']
+    lats = np.where(lats > -90, lats, np.nan)
+    lats = np.where(np.isfinite(lats), lats, np.nan)
+    
+    lons = pridata['lon']
+    lons = np.where(lons > -180, lons, np.nan)
+    lons = np.where(np.isfinite(lons), lons, np.nan)
+    
+    lons = xr.DataArray(lons, dims=["y", "x"])
+    lats = xr.DataArray(lats, dims=["y", "x"])
+    lats = np.where(np.gradient(lats)[0]==0.0,  np.nan, lats)
+    lons = np.where(np.gradient(lats)[0]==0.0,  np.nan, lons)
+    lons = xr.DataArray(lons, dims=["y", "x"])
+    lats = xr.DataArray(lats, dims=["y", "x"])
+
+    #print(np.unique(np.gradient(lats))[0], np.unique(np.gradient(lats))[1], lons, indata.shape)
+    
+    '''
     lats = pridata['lat']
     lats = np.where(lats > -90, lats, 180.)
     lats = np.where(np.isfinite(lats), lats, 380.)
@@ -420,7 +457,7 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
     lons = np.where(np.isfinite(lons), lons, 380.)
     lons = xr.DataArray(lons, dims=["y", "x"])
     lats = xr.DataArray(lats, dims=["y", "x"])
-    
+    '''
     lat_max = lats.max().values
     lat_min = lats.min().values
     lon_max = lons.max().values
@@ -430,16 +467,27 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
     pix_width = math.floor((lon_max-lon_min)/opts.out_img_res)
     
     indata_def = geometry.SwathDefinition(lats=lats, lons=lons)
+    #print(indata_def)
     area_def = create_area_def('test_area',
                                {'proj': 'latlong', 'lon_0': 0},
                                area_extent=(lon_min, lat_min, lon_max, lat_max),
                                width=pix_width,
                                height=pix_height)
     if len(indata.shape) == 3:
+        
+        print(lats.shape, indata.shape)
+        print(indata[:,:,0])
+        indata[:,:,0] = np.where(np.isfinite(np.gradient(lats)[0]), indata[:,:,0], np.nan)
+        indata[:,:,1] = np.where(np.isfinite(np.gradient(lats)[0]), indata[:,:,1], np.nan) 
+        indata[:,:,2] = np.where(np.isfinite(np.gradient(lats)[0]), indata[:,:,2], np.nan) 
+        #indata[:,:,0] = np.where(np.gradient(lats)[0]==np.nan, np.nan, indata[:,:,0])
+        print(indata[:,:,0])
+        #indata[:,:,1] = np.where(lats==fill_value, np.nan, indata[:,:,1])
+        #indata[:,:,2] = np.where(lats==fill_value, np.nan, indata[:,:,2])
         data_xr1 = xr.DataArray(indata[:,:,0], dims=["y", "x"])
         data_xr2 = xr.DataArray(indata[:,:,1], dims=["y", "x"])
         data_xr3 = xr.DataArray(indata[:,:,2], dims=["y", "x"])
-        
+        latsnotres = xr.DataArray(np.gradient(lats)[0], dims=["y", "x"])
                                
         res1 = resample.resample(indata_def,
                                  data_xr1,
@@ -465,10 +513,19 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
                                  radius_of_influence=roi,
                                  fill_value=fill_value,
                                  cache_dir=opts.cache_dir)
+        latresampled = resample.resample(indata_def,
+                                 latsnotres,
+                                 area_def,
+                                 resampler=opts.res_meth,
+                                 reduce_data=False,
+                                 radius_of_influence=roi,
+                                 fill_value=fill_value,
+                                 cache_dir=opts.cache_dir)
         res = np.dstack((res1, res2, res3))
+        return res, area_def, (lon_min, lon_max, lat_min, lat_max), latresampled
     else:
+        indata = np.where(lats==fill_value, np.nan, indata)
         data_xr = xr.DataArray(indata[:,:], dims=["y", "x"])
-        
         res = resample.resample(indata_def,
                                 data_xr,
                                 area_def,
@@ -477,8 +534,7 @@ def resample_data(indata, pridata, opts, roi=50000, fill_value=-999):
                                 radius_of_influence=roi,
                                 fill_value=fill_value,
                                 cache_dir=opts.cache_dir)
-
-    return res, area_def, (lon_min, lon_max, lat_min, lat_max)
+        return res, area_def, (lon_min, lon_max, lat_min, lat_max)    
 '''
 def resample_data(indata, pridata, opts, roi=50000):
     """Transform raw SEVIRI data into required output projection.

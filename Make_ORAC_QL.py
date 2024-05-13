@@ -3,6 +3,7 @@ import sys
 sys.path.append('/home/users/dhegedus/seviri_ql')
 import seviri_additional_cloud_tests as extra_tests
 from datetime import datetime
+#import plotting_fixedges as sev_plot
 import plotting as sev_plot
 from getopt import getopt
 import cProfile
@@ -88,15 +89,15 @@ def main(opts):
 
     pri_data = extra_tests.apply_filters(pri_data, opts)
     print('Start plotting')
-    # False color image
+    # False color image 
     # Get the output data scaled into byte range
     odata_fc = sev_plot.retr_fc(pri_data, sec_data, opts.perc_max, opts.sza_thresh)
     # Resample onto appropriate grid for cesium
-    res_data_fc, res_area, area_ext = sev_plot.resample_data(odata_fc, pri_data, opts)
+    res_data_fc, res_area, area_ext, latmask = sev_plot.resample_data(odata_fc, pri_data, opts)
     # Find area definition, needed for coastlines
     area_def = (res_area.proj4_string, res_area.area_extent)
     # Save the output to disk
-    im = sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def, area_ext)
+    im = sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def, area_ext, latmask)
     sev_plot.save_plot_fc_ql(outfiles_ql['FC'], res_data_fc, opts, im, area_ext)
     #sev_plot.save_plot_fc(outfiles_cs['FC'], res_data_fc, opts, area_def, addcoast=True)
     print('Start phase')
@@ -104,7 +105,7 @@ def main(opts):
     # Get the output data scaled into byte range
     odata_phs = sev_plot.retr_phs(pri_data)
     # Resample onto appropriate grid for cesium
-    res_data_phs, res_area, area_ext = sev_plot.resample_data(odata_phs, pri_data, opts)
+    res_data_phs, res_area, area_ext, _ = sev_plot.resample_data(odata_phs, pri_data, opts)
     # Save the output to disk
     im = sev_plot.save_plot_phs(outfiles_cs['PHS'], res_data_phs, opts, area_def)
     sev_plot.save_plot_phs_ql(outfiles_ql['PHS'], res_data_phs, opts, im, area_ext)
@@ -117,7 +118,7 @@ def main(opts):
     opts.keytitle = 'Cloud-top height (km)'
     opts.keyticks = ['0', '2.5', '5', '7.5', '10', '12.5', '>15']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(pri_data['cth'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_ql[opts.varname], res_data_cod, opts, im, area_ext)
 
     # Cloud Optical depth image
@@ -128,7 +129,7 @@ def main(opts):
     opts.keytitle = 'Cloud optical depth (550 nm)'
     opts.keyticks = ['0.1', '1', '10', '>100']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(pri_data['cot'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # Cloud effective radius image
@@ -139,7 +140,7 @@ def main(opts):
     opts.keytitle = 'Cloud effective radius (micrometer)'
     opts.keyticks = ['0',  '25', '50']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(pri_data['cer'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_ql[opts.varname], res_data_cod, opts, im, area_ext)
 
     # Aerosol Optical depth image
@@ -150,7 +151,7 @@ def main(opts):
     opts.keytitle = 'Aerosol optical depth (550 nm)'
     opts.keyticks = ['0.0', '0.2', '0.4', '0.6', '0.8', '1.0', '>1.2']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(pri_data['aot550'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, area_ext=area_ext)
+    im = sev_plot.save_plot_cmap(outfiles_cs[opts.varname], res_data_cod, opts, latmask, area_ext=area_ext)
     sev_plot.save_plot_cmap_ql(outfiles_ql[opts.varname], res_data_cod, opts, im, area_ext)
     print('Start Fluxes')
     # ToA upwelling SW radiation image
@@ -161,7 +162,7 @@ def main(opts):
     opts.keytitle = 'Top of Atmosphere upwelling SW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['toa_swup'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
 
     # ToA downwelling SW radiation image
@@ -172,7 +173,7 @@ def main(opts):
     opts.keytitle = 'Top of Atmosphere downwelling SW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000','1200', '1400']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['toa_swdn'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_ql[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_ql[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # ToA upwelling LW radiation image
@@ -183,7 +184,7 @@ def main(opts):
     opts.keytitle = 'Top of Atmosphere upwelling LW radiation'
     opts.keyticks = ['0.0', '100', '200', '300', '400', '500']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['toa_lwup'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # BoA upwelling SW radiation image
@@ -194,7 +195,7 @@ def main(opts):
     opts.keytitle = 'Bottom of Atmosphere upwelling SW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['boa_swup'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # BoA downwelling SW radiation image
@@ -205,7 +206,7 @@ def main(opts):
     opts.keytitle = 'Bottom of Atmosphere downwelling SW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['boa_swdn'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # BoA upwelling LW radiation image
@@ -216,7 +217,7 @@ def main(opts):
     opts.keytitle = 'Bottom of Atmosphere upwelling LW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['boa_lwup'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     
     # BoA downwelling LW radiation image
@@ -227,7 +228,7 @@ def main(opts):
     opts.keytitle = 'Bottom of Atmosphere downwelling LW radiation'
     opts.keyticks = ['0.0', '200', '400', '600', '800', '1000']
     res_data_cod, res_area, area_ext = sev_plot.resample_data(flx_data['boa_lwdn'], pri_data, opts)
-    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts)
+    im = sev_plot.save_plot_cmap(outfiles_flx_cs[opts.varname], res_data_cod, opts, latmask)
     sev_plot.save_plot_cmap_ql(outfiles_flx_ql[opts.varname], res_data_cod, opts, im, area_ext)
     print('End fluxes')
     
